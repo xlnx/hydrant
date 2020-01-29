@@ -1,0 +1,5 @@
+/build
+*.*~
+.vscode
+test.*.h264
+*.png
