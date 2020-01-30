@@ -1,5 +1,6 @@
 #include <string>
 #include <cxxopts.hpp>
+#include <VMUtils/timer.hpp>
 #include <varch/utils/unbounded_io.hpp>
 #include <varch/unarchive/unarchiver.hpp>
 #include <varch/unarchive/statistics.hpp>
@@ -24,24 +25,39 @@ int main( int argc, char **argv )
 
 	const double max_t = 8, avg_t = 1e-3;
 
-	Thumbnail<float> thumbnail( unarchiver.dim() );
+	Thumbnail<ThumbUnit> thumbnail( unarchiver.dim() );
 	Statistics stats;
 	StatisticsCollector collector( unarchiver );
-	for ( int z = 0; z != unarchiver.dim().z; ++z ) {
-		for ( int y = 0; y != unarchiver.dim().y; ++y ) {
-			for ( int x = 0; x != unarchiver.dim().x; ++x ) {
-				Idx idx = { x, y, z };
-				collector.compute_into( idx, stats );
-				if ( stats.src.max < max_t && stats.src.avg < avg_t ) {
-					thumbnail[ idx ] = 0;
-					// continue;
-				} else {
-					thumbnail[ idx ] = stats.src.avg;
-				}
-				vm::println( "{} {} {} -> {} {}", x, y, z, stats.src.max, stats.src.avg );
-			}
-		}
+
+	{
+		vm::Timer::Scoped timer(
+		  [&]( auto dt ) {
+			  vm::println( "thumbnailing time: {}", dt.ms() );
+		  } );
+		thumbnail.iterate_3d(
+		  [&]( Idx const &idx ) {
+			  collector.compute_into( idx, stats );
+			  if ( stats.src.max < max_t && stats.src.avg < avg_t ) {
+				  thumbnail[ idx ].value = 0;
+				  // continue;
+			  } else {
+				  thumbnail[ idx ].value = stats.src.avg;
+			  }
+		  } );
 	}
+
+	{
+		vm::Timer::Scoped timer(
+		  [&]( auto dt ) {
+			  vm::println( "chebyshev compute time: {}", dt.ms() );
+		  } );
+		thumbnail.compute_chebyshev();
+	}
+
+	// thumbnail.iterate_3d(
+	//   [&]( Idx const &idx ) {
+	// 	  vm::println( "{} -> {}", idx, thumbnail[ idx ].chebyshev );
+	//   } );
 
 	ofstream os( in + ".thumb" );
 	UnboundedStreamWriter writer( os );

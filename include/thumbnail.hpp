@@ -2,6 +2,7 @@
 
 #include <vector>
 #include <cstdint>
+#include <glm/glm.hpp>
 #include <VMUtils/modules.hpp>
 #include <VMUtils/attributes.hpp>
 #include <varch/utils/io.hpp>
@@ -9,9 +10,18 @@
 
 VM_BEGIN_MODULE( hydrant )
 
+using namespace glm;
+
 VM_EXPORT
 {
-	template <typename T>
+	struct ThumbUnit
+	{
+		float value;
+		uint32_t chebyshev = 0;
+	};
+
+	template <typename T, typename = typename std::enable_if<
+							std::is_base_of<ThumbUnit, T>::value>::type>
 	struct Thumbnail
 	{
 		Thumbnail( vol::Idx const &dim ) :
@@ -38,6 +48,70 @@ VM_EXPORT
 			return buf[ idx.z * dim.x * dim.y +
 						idx.y * dim.x +
 						idx.x ];
+		}
+
+		template <typename F>
+		void iterate_3d( F const &f )
+		{
+			vol::Idx idx;
+			for ( idx.z = 0; idx.z != dim.z; ++idx.z ) {
+				for ( idx.y = 0; idx.y != dim.y; ++idx.y ) {
+					for ( idx.x = 0; idx.x != dim.x; ++idx.x ) {
+						f( idx );
+					}
+				}
+			}
+		}
+
+		void compute_chebyshev()
+		{
+			auto maxd = max( dim.x, max( dim.y, dim.z ) );
+			vec<3, int> d14[] = {
+				{ -1, 0, 0 },
+				{ 1, 0, 0 },
+				{ 0, -1, 0 },
+				{ 0, 1, 0 },
+				{ 0, 0, -1 },
+				{ 0, 0, 1 },
+				{ -1, -1, -1 },
+				{ -1, 1, -1 },
+				{ 1, 1, -1 },
+				{ 1, -1, -1 },
+				{ -1, -1, 1 },
+				{ -1, 1, 1 },
+				{ 1, 1, 1 },
+				{ 1, -1, 1 },
+			};
+			iterate_3d(
+			  [&]( vol::Idx const &idx ) {
+				  if ( !( *this )[ idx ].value ) {
+					  ( *this )[ idx ].chebyshev = maxd;
+				  }
+			  } );
+			bool update;
+			do {
+				update = false;
+				iterate_3d(
+				  [&]( vol::Idx const &idx ) {
+					  if ( !( *this )[ idx ].value ) {
+						  vec<3, int> u = { idx.x, idx.y, idx.z };
+						  for ( int i = 0; i != 14; ++i ) {
+							  auto v = u + d14[ i ];
+							  uint32_t d0;
+							  if ( v.x < 0 || v.y < 0 || v.z < 0 ||
+								   v.x >= dim.x || v.y >= dim.y || v.z >= dim.z ) {
+								  d0 = maxd;
+							  } else {
+								  d0 = ( *this )[ { v.x, v.y, v.z } ].chebyshev + 1;
+							  }
+							  if ( d0 < ( *this )[ idx ].chebyshev ) {
+								  ( *this )[ idx ].chebyshev = d0;
+								  update = true;
+							  }
+						  }
+					  }
+				  } );
+			} while ( update );
 		}
 
 		void dump( vol::Writer &writer ) const

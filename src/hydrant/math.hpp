@@ -14,10 +14,11 @@ inline std::ostream &operator<<( std::ostream &os, glm::mat4 const &m )
 	return os;
 }
 
-inline std::ostream &operator<<( std::ostream &os, glm::vec4 const &v )
+template <int N, typename T>
+inline std::ostream &operator<<( std::ostream &os, glm::vec<N, T> const &v )
 {
-	for ( int i = 0; i != 4; ++i ) {
-		vm::fprintln( os, "{}", v[ i ] );
+	for ( int i = 0; i != N; ++i ) {
+		vm::fprint( os, "{}, ", v[ i ] );
 	}
 	return os;
 }
