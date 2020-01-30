@@ -1,4 +1,4 @@
-file(GLOB_RECURSE SOURCES *.cc)
+file(GLOB_RECURSE SOURCES *.cc *.cu)
 
 cuda_add_executable(hydrant ${SOURCES})
 

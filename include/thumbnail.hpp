@@ -2,11 +2,11 @@
 
 #include <vector>
 #include <cstdint>
-#include <glm/glm.hpp>
 #include <VMUtils/modules.hpp>
 #include <VMUtils/attributes.hpp>
 #include <varch/utils/io.hpp>
 #include <varch/utils/common.hpp>
+#include <glm_math.hpp>
 
 VM_BEGIN_MODULE( hydrant )
 

@@ -21,5 +21,9 @@ vm_external_module(
 )
 
 find_package(CUDA)
+set(CUDA_NVCC_FLAGS ${CMAKE_NVCC_FLAGS}
+  -Xcudafe
+  --diag_suppress="2913" 
+)
 
 add_subdirectory(src)
