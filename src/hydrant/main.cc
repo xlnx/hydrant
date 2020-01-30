@@ -1,4 +1,5 @@
 #include <fstream>
+#include <VMUtils/timer.hpp>
 #include <VMUtils/cmdline.hpp>
 #include <varch/utils/io.hpp>
 #include <thumbnail.hpp>
@@ -66,32 +67,42 @@ int main( int argc, char **argv )
 		camera.set_position( x, y, z );
 	}
 
+	auto th_4 = thumbnail.dim.x / 4.f;
 	cufx::Image<Pixel> image( 512, 512 );
 	Raycaster raycaster;
-	raycaster.cast(
-	  exhibit, camera, image,
-	  [&]( Ray const &ray ) -> Pixel {
-		  const auto nsteps = 500;
-		  const auto step = ray.d * 1e-2f;
+	{
+		vm::Timer::Scoped timer( []( auto dt ) {
+			vm::println( "time: {}", dt.ms() );
+		} );
+		raycaster.cast(
+		  exhibit, camera, image,
+		  [&]( Ray const &ray ) -> Pixel {
+			  const auto nsteps = 500;
+			  const auto step = ray.d * 1e-2f * th_4;
+			  const auto opacity_threshold = 0.95f;
+			  const auto density = 3e-3f;
 
-		  Pixel pixel = {};
-		  float tnear, tfar;
-		  if ( ray.intersect( bbox, tnear, tfar ) ) {
-			  auto p = ray.o + ray.d * tnear;
-			  for ( int i = 0; i != nsteps; ++i ) {
-				  p += step;
-				  glm::vec<3, int> pt = p;
-				  if ( pt.x >= 0 && pt.y >= 0 && pt.z >= 0 &&
-					   pt.x < thumbnail.dim.x && pt.y < thumbnail.dim.y && pt.z < thumbnail.dim.z ) {
-					  if ( thumbnail[ { pt.x, pt.y, pt.z } ] ) {
-						  pixel.v = glm::vec4{ 1, 1, 1, 1 };
+			  Pixel pixel = {};
+			  float tnear, tfar;
+			  if ( ray.intersect( bbox, tnear, tfar ) ) {
+				  auto p = ray.o + ray.d * tnear;
+				  for ( int i = 0; i != nsteps; ++i ) {
+					  p += step;
+					  glm::vec<3, int> pt = p;
+					  if ( pt.x >= 0 && pt.y >= 0 && pt.z >= 0 &&
+						   pt.x < thumbnail.dim.x && pt.y < thumbnail.dim.y && pt.z < thumbnail.dim.z ) {
+						  if ( float val = thumbnail[ { pt.x, pt.y, pt.z } ] ) {
+							  auto col = glm::vec4{ 1, 1, 1, 1 } * val * density;
+							  pixel.v += col * ( 1.f - pixel.v.w );
+							  if ( pixel.v.w > opacity_threshold ) break;
+						  }
 					  }
 				  }
 			  }
-		  }
-		  //   pixel.v = float4{ ray.d.x, ray.d.y, ray.d.z, 1 };
-		  return pixel;
-	  } );
+			  //   pixel.v = float4{ ray.d.x, ray.d.y, ray.d.z, 1 };
+			  return pixel;
+		  } );
+	}
 
 	image.dump( out );
 }

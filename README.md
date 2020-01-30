@@ -1,0 +1,3 @@
+# Thumbnail
+
+![](docs/thumbnail.png)

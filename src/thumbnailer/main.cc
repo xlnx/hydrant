@@ -38,7 +38,7 @@ int main( int argc, char **argv )
 				} else {
 					thumbnail[ idx ] = stats.src.avg;
 				}
-				// vm::println( "{} {} {} -> {} {}", x, y, z, stats.src.max, stats.src.avg );
+				vm::println( "{} {} {} -> {} {}", x, y, z, stats.src.max, stats.src.avg );
 			}
 		}
 	}

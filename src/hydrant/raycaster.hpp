@@ -94,9 +94,6 @@ VM_EXPORT
 						{ 0, 0, scale, 0 },
 						{ e.center.x, e.center.y, e.center.z, 1 } };
 			auto ivt = inverse( c.get_matrix() );
-			// vm::println( "{}", et );
-			// vm::println( "{}", ivt );
-			// vm::println( "{}", et * ivt * vec4{ 1, 0, -2.2, 1 } );
 
 			auto itg_fovy = 1. / tan( M_PI / 3 / 2 );
 			auto tt = et * ivt;
@@ -108,7 +105,6 @@ VM_EXPORT
 				for ( int x = 0; x != img.get_width(); ++x ) {
 					auto uv = ( vec2{ x, y } - cc ) * 2.f / float( img.get_height() );
 					ray.d = normalize( vec3( tt * vec4( uv.x, -uv.y, -itg_fovy, 1 ) ) - ray.o );
-					// vm::println( "{}", std::make_tuple( vv.x, vv.y, vv.z, vv.w ) );
 					img.at( x, y ) = f( ray );
 				}
 			}
