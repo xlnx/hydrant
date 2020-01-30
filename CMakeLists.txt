@@ -22,13 +22,4 @@ vm_external_module(
 
 find_package(CUDA)
 
-file(GLOB_RECURSE SOURCES src/*.cc)
-
-cuda_add_executable(hydrant ${SOURCES})
-
-target_include_directories(hydrant PUBLIC
-  ${PROJECT_SOURCE_DIR}/include
-)
-
-vm_target_dependency(hydrant voxel_unarchive PUBLIC)
-vm_target_dependency(hydrant cudafx PUBLIC)
+add_subdirectory(src)

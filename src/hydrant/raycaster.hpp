@@ -1,61 +1,49 @@
 #pragma once
 
 #include <algorithm>
-#include <glm/glm.hpp>
-#include <glm/gtc/matrix_transform.hpp>
-#include <VMUtils/fmt.hpp>
-#include <VMUtils/attributes.hpp>
 #include <cudafx/image.hpp>
+#include <VMUtils/json_binding.hpp>
+#include "math.hpp"
 
-std::ostream &operator<<( std::ostream &os, glm::mat4 const &m )
+namespace glm
 {
-	for ( int i = 0; i != 4; ++i ) {
-		vm::fprintln( os, "{} {} {} {}", m[ 0 ][ i ], m[ 1 ][ i ], m[ 2 ][ i ], m[ 3 ][ i ] );
-	}
-	return os;
-}
-
-std::ostream &operator<<( std::ostream &os, glm::vec4 const &v )
+void to_json( nlohmann::json &j, const vec3 &v )
 {
-	for ( int i = 0; i != 4; ++i ) {
-		vm::fprintln( os, "{}", v[ i ] );
-	}
-	return os;
+	j = { v.x, v.y, v.z };
 }
+void from_json( const nlohmann::json &j, vec3 &v )
+{
+	v.x = j[ 0 ].get<float>();
+	v.y = j[ 1 ].get<float>();
+	v.z = j[ 2 ].get<float>();
+}
+}  // namespace glm
 
 VM_BEGIN_MODULE( hydrant )
 
 using namespace glm;
 
+struct PTU : vm::json::Serializable<PTU>
+{
+	VM_JSON_FIELD( vec3, position );
+	VM_JSON_FIELD( vec3, target ) = { 0, 0, 0 };
+	VM_JSON_FIELD( vec3, up ) = { 0, 1, 0 };
+};
+
+struct Orbit : vm::json::Serializable<Orbit>
+{
+	VM_JSON_FIELD( vec3, center ) = { 0, 0, 0 };
+	VM_JSON_FIELD( vec3, arm );
+};
+
+struct CameraConfig : vm::json::Serializable<CameraConfig>
+{
+	VM_JSON_FIELD( std::shared_ptr<PTU>, ptu ) = nullptr;
+	VM_JSON_FIELD( std::shared_ptr<Orbit>, orbit ) = nullptr;
+};
+
 VM_EXPORT
 {
-	struct Box3D
-	{
-		VM_DEFINE_ATTRIBUTE( vec3, min );
-		VM_DEFINE_ATTRIBUTE( vec3, max );
-	};
-
-	struct Ray
-	{
-		VM_DEFINE_ATTRIBUTE( vec3, o );
-		VM_DEFINE_ATTRIBUTE( vec3, d );
-
-		bool intersect( Box3D const &box, float &tnear, float &tfar ) const
-		{
-			vec3 invr = vec3{ 1., 1., 1. } / d;
-			vec3 tbot = invr * ( box.min - o );
-			vec3 ttop = invr * ( box.max - o );
-
-			vec3 tmin = min( ttop, tbot );
-			vec3 tmax = max( ttop, tbot );
-
-			tnear = max( max( tmin.x, tmin.y ), tmin.z );
-			tfar = min( min( tmax.x, tmax.y ), tmax.z );
-
-			return tfar > tnear;
-		}
-	};
-
 	struct Exhibit : vm::Dynamic
 	{
 		VM_DEFINE_ATTRIBUTE( vec3, size );
@@ -69,6 +57,28 @@ VM_EXPORT
 		VM_DEFINE_ATTRIBUTE( vec3, up ) = { 0, 1, 0 };
 
 		mat4 get_matrix() const { return lookAt( position, target, up ); }
+
+	public:
+		static Camera from_config( std::string const &filename )
+		{
+			CameraConfig cfg;
+			std::ifstream is( filename );
+			is >> cfg;
+
+			Camera camera;
+			if ( cfg.ptu ) {
+				camera.position = cfg.ptu->position;
+				camera.target = cfg.ptu->target;
+				camera.up = cfg.ptu->up;
+			} else if ( cfg.orbit ) {
+				camera.target = cfg.orbit->center;
+				auto m = identity<mat4>();
+				m = rotate( m, radians( cfg.orbit->arm.y ), vec3{ 0, 0, 1 } );
+				m = rotate( m, radians( cfg.orbit->arm.x ), vec3{ 0, 1, 0 } );
+				camera.position = m * vec4{ cfg.orbit->arm.z, 0, 0, 1 };
+			}
+			return camera;
+		}
 	};
 
 	struct Raycaster
@@ -97,7 +107,7 @@ VM_EXPORT
 			for ( int y = 0; y != img.get_height(); ++y ) {
 				for ( int x = 0; x != img.get_width(); ++x ) {
 					auto uv = ( vec2{ x, y } - cc ) * 2.f / float( img.get_height() );
-					ray.d = vec3( tt * vec4( uv.x, uv.y, -itg_fovy, 1 ) ) - ray.o;
+					ray.d = normalize( vec3( tt * vec4( uv.x, -uv.y, -itg_fovy, 1 ) ) - ray.o );
 					// vm::println( "{}", std::make_tuple( vv.x, vv.y, vv.z, vv.w ) );
 					img.at( x, y ) = f( ray );
 				}
