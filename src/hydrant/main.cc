@@ -1,4 +1,5 @@
 #include <fstream>
+#include <atomic>
 #include <VMUtils/timer.hpp>
 #include <VMUtils/cmdline.hpp>
 #include <varch/utils/io.hpp>
@@ -71,10 +72,10 @@ int main( int argc, char **argv )
 	cufx::Image<Pixel> image( 512, 512 );
 	Raycaster raycaster;
 	{
-		double total_steps = 0;
+		std::atomic_uint64_t total_steps( 0 );
 		vm::Timer::Scoped timer( [&]( auto dt ) {
 			vm::println( "time: {}   avg_step: {}",
-						 dt.ms(), total_steps / image.get_width() / image.get_height() );
+						 dt.ms(), total_steps.load() / image.get_width() / image.get_height() );
 		} );
 
 		raycaster.cast(

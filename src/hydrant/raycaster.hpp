@@ -1,5 +1,6 @@
 #pragma once
 
+#include <thread>
 #include <algorithm>
 #include <cudafx/image.hpp>
 #include <VMUtils/json_binding.hpp>
@@ -99,15 +100,22 @@ VM_EXPORT
 			auto tt = et * ivt;
 			auto cc = vec2{ img.get_width(), img.get_height() } / 2.f;
 
-			Ray ray = { et * vec4{ c.position.x, c.position.y, c.position.z, 1 }, {} };
-
-			for ( int y = 0; y != img.get_height(); ++y ) {
-				for ( int x = 0; x != img.get_width(); ++x ) {
-					auto uv = ( vec2{ x, y } - cc ) * 2.f / float( img.get_height() );
-					ray.d = normalize( vec3( tt * vec4( uv.x, -uv.y, -itg_fovy, 1 ) ) - ray.o );
-					img.at( x, y ) = f( ray );
-				}
+			auto nthreads = std::thread::hardware_concurrency();
+			std::vector<std::thread> threads;
+			for ( int i = 0; i != nthreads; ++i ) {
+				threads.emplace_back(
+				  [&, y0 = i] {
+					  Ray ray = { et * vec4{ c.position.x, c.position.y, c.position.z, 1 }, {} };
+					  for ( int y = y0; y < img.get_height(); y += nthreads ) {
+						  for ( int x = 0; x < img.get_width(); ++x ) {
+							  auto uv = ( vec2{ x, y } - cc ) * 2.f / float( img.get_height() );
+							  ray.d = normalize( vec3( tt * vec4( uv.x, -uv.y, -itg_fovy, 1 ) ) - ray.o );
+							  img.at( x, y ) = f( ray );
+						  }
+					  }
+				  } );
 			}
+			for ( auto &t : threads ) { t.join(); }
 		}
 	};
 }
