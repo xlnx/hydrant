@@ -28,6 +28,53 @@ using namespace std;
 using namespace vol;
 using namespace hydrant;
 
+struct Shader : DeviceShader<Pixel>
+{
+	__host__ __device__ void 
+	  apply( Ray const &ray, Pixel &pixel ) const
+	{
+		const auto nsteps = 500;
+		const auto step = 1e-2f * th_4;
+		const auto opacity_threshold = 0.95f;
+		const auto density = 3e-3f;
+		const auto abs_d = glm::abs(ray.d);
+		const auto cdu = 1.f / max( abs_d.x, max( abs_d.y, abs_d.z ) );
+
+		pixel = {};
+		float tnear, tfar;
+		if ( ray.intersect( bbox, tnear, tfar ) ) {
+			auto p = ray.o + ray.d * tnear;
+			int i;
+			for ( i = 0; i < nsteps; ++i ) {
+				p += ray.d * step;
+				glm::vec<3, int> pt = floor( p );
+
+				if ( !( pt.x >= 0 && pt.y >= 0 && pt.z >= 0 &&
+						pt.x < 5 && pt.y < 5 && pt.z < 5 ) ) {
+					break;
+				}
+				if ( float cd = thumbnail[  pt.x][ pt.y][ pt.z ].y ) {
+					float tnear, tfar;
+					Ray{ p, ray.d }.intersect( Box3D{ pt, pt + 1 }, tnear, tfar );
+					auto d = tfar + ( cd - 1 ) * cdu;
+					i += d / step;
+					p += ray.d * d;
+				} else {
+					auto val = thumbnail[  pt.x][ pt.y][ pt.z ].x;
+					auto col = glm::vec4{ 1, 1, 1, 1 } * val * density;
+					pixel.v += col * ( 1.f - pixel.v.w );
+					if ( pixel.v.w > opacity_threshold ) break;
+				}
+			}
+		}
+	}
+
+public:
+	Box3D bbox;
+	float th_4;
+	glm::vec2 thumbnail[5][5][5];
+};
+
 int main( int argc, char **argv )
 {
 	cmdline::parser a;
@@ -49,13 +96,23 @@ int main( int argc, char **argv )
 	StreamReader reader( is, 0, len );
 
 	Thumbnail<ThumbUnit> thumbnail( reader );
+	Shader shader;
 
 	glm::vec3 min = { 0, 0, 0 };
 	glm::vec3 max = { thumbnail.dim.x, thumbnail.dim.y, thumbnail.dim.z };
 	auto exhibit = Exhibit{}
 					 .set_center( max / 2.f )
 					 .set_size( max );
-	auto bbox = Box3D{ min, max };
+
+	shader.bbox = Box3D{ min, max };
+	shader.th_4 = thumbnail.dim.x / 4.f;
+	thumbnail.iterate_3d(
+		[&](Idx const &idx) {
+			auto &dst = shader.thumbnail[idx.x][idx.y][idx.z];
+			auto &src = thumbnail[idx];
+			dst = { src.value, src.chebyshev };
+		}
+	);
 
 	auto camera = Camera{};
 	if ( a.exist( "config" ) ) {
@@ -68,8 +125,12 @@ int main( int argc, char **argv )
 		camera.set_position( x, y, z );
 	}
 
-	auto th_4 = thumbnail.dim.x / 4.f;
+	auto devices = cufx::Device::scan();
 	cufx::Image<Pixel> image( 512, 512 );
+	auto device_swap = devices[0].alloc_image_swap( image );
+	auto img_view = image.view().with_device_memory( device_swap.second );
+	img_view.copy_to_device().launch();
+
 	Raycaster raycaster;
 	{
 		std::atomic_uint64_t total_steps( 0 );
@@ -78,49 +139,11 @@ int main( int argc, char **argv )
 						 dt.ms(), total_steps.load() / image.get_width() / image.get_height() );
 		} );
 
-		raycaster.cast(
-		  exhibit, camera, image,
-		  [&]( Ray const &ray ) -> Pixel {
-			  const auto nsteps = 500;
-			  const auto step = 1e-2f * th_4;
-			  const auto opacity_threshold = 0.95f;
-			  const auto density = 3e-3f;
-			  const auto cdu = 1.f / std::max( std::abs( ray.d.x ),
-											   std::max( std::abs( ray.d.y ),
-														 std::abs( ray.d.z ) ) );
-
-			  Pixel pixel = {};
-			  float tnear, tfar;
-			  if ( ray.intersect( bbox, tnear, tfar ) ) {
-				  auto p = ray.o + ray.d * tnear;
-				  int i;
-				  for ( i = 0; i < nsteps; ++i ) {
-					  p += ray.d * step;
-					  glm::vec<3, int> pt = floor( p );
-
-					  if ( !( pt.x >= 0 && pt.y >= 0 && pt.z >= 0 &&
-							  pt.x < thumbnail.dim.x && pt.y < thumbnail.dim.y && pt.z < thumbnail.dim.z ) ) {
-						  break;
-					  }
-					  if ( float cd = thumbnail[ { pt.x, pt.y, pt.z } ].chebyshev ) {
-						  float tnear, tfar;
-						  Ray{ p, ray.d }.intersect( Box3D{ pt, pt + 1 }, tnear, tfar );
-						  auto d = tfar + ( cd - 1 ) * cdu;
-						  i += d / step;
-						  p += ray.d * d;
-					  } else {
-						  auto val = thumbnail[ { pt.x, pt.y, pt.z } ].value;
-						  auto col = glm::vec4{ 1, 1, 1, 1 } * val * density;
-						  pixel.v += col * ( 1.f - pixel.v.w );
-						  if ( pixel.v.w > opacity_threshold ) break;
-					  }
-				  }
-				  total_steps += i;
-			  }
-			  //   pixel.v = float4{ ray.d.x, ray.d.y, ray.d.z, 1 };
-			  return pixel;
-		  } );
+		vm::println("{}", shader.bbox.max);
+		raycaster.cast( exhibit, camera, img_view, shader );
 	}
+
+	img_view.copy_from_device().launch();
 
 	image.dump( out );
 }
