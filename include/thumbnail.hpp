@@ -1,7 +1,6 @@
 #pragma once
 
 #include <vector>
-#include <cstdint>
 #include <VMUtils/modules.hpp>
 #include <VMUtils/attributes.hpp>
 #include <varch/utils/io.hpp>
@@ -17,7 +16,7 @@ VM_EXPORT
 	struct ThumbUnit
 	{
 		float value;
-		uint32_t chebyshev = 0;
+		float chebyshev = 0;
 	};
 
 	template <typename T, typename = typename std::enable_if<
@@ -36,6 +35,9 @@ VM_EXPORT
 		}
 
 	public:
+		T *data() { return buf.data(); }
+		T const *data() const { return buf.data(); }
+
 		T &operator[]( vol::Idx const &idx )
 		{
 			return buf[ idx.z * dim.x * dim.y +
@@ -97,12 +99,12 @@ VM_EXPORT
 						  vec<3, int> u = { idx.x, idx.y, idx.z };
 						  for ( int i = 0; i != 14; ++i ) {
 							  auto v = u + d14[ i ];
-							  uint32_t d0;
+							  float d0;
 							  if ( v.x < 0 || v.y < 0 || v.z < 0 ||
 								   v.x >= dim.x || v.y >= dim.y || v.z >= dim.z ) {
 								  d0 = maxd;
 							  } else {
-								  d0 = ( *this )[ { v.x, v.y, v.z } ].chebyshev + 1;
+								  d0 = ( *this )[ { v.x, v.y, v.z } ].chebyshev + 1.f;
 							  }
 							  if ( d0 < ( *this )[ idx ].chebyshev ) {
 								  ( *this )[ idx ].chebyshev = d0;

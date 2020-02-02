@@ -149,7 +149,7 @@ VM_EXPORT
 		CastOptions get_basic_cast_opts( Exhibit const &e, Camera const &c, cufx::ImageView<P> &img )
 		{
 			auto d = max( abs( e.center - e.size ), abs( e.center ) );
-			float scale = max( d.x, max( d.y, d.z ) );
+			float scale = glm::compMax( d );
 			mat4 et = { { scale, 0, 0, 0 },
 						{ 0, scale, 0, 0 },
 						{ 0, 0, scale, 0 },
@@ -212,10 +212,9 @@ VM_EXPORT
 
 			ShaderRegisterer<F>::fill_opts( opts, img, f );
 
-			auto devices = cufx::Device::scan();
 			auto kernel_block_dim = dim3( 32, 32 );
 			auto launch_info = cufx::KernelLaunchInfo{}
-								 .set_device( devices[ 0 ] )
+								 .set_device( cufx::Device::scan()[ 0 ] )
 								 .set_grid_dim( round_up_div( opts.resolution.x, kernel_block_dim.x ),
 												round_up_div( opts.resolution.y, kernel_block_dim.y ) )
 								 .set_block_dim( kernel_block_dim );

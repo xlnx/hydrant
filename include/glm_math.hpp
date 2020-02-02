@@ -1,28 +1,14 @@
 #pragma once
 
 #include <glm/glm.hpp>
+#define GLM_ENABLE_EXPERIMENTAL
+#include <glm/gtx/io.hpp>
+#include <glm/gtx/component_wise.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <VMUtils/fmt.hpp>
 #include <VMUtils/attributes.hpp>
 #include <VMUtils/modules.hpp>
 #include <VMUtils/json_binding.hpp>
-
-inline std::ostream &operator<<( std::ostream &os, glm::mat4 const &m )
-{
-	for ( int i = 0; i != 4; ++i ) {
-		vm::fprintln( os, "{} {} {} {}", m[ 0 ][ i ], m[ 1 ][ i ], m[ 2 ][ i ], m[ 3 ][ i ] );
-	}
-	return os;
-}
-
-template <int N, typename T>
-inline std::ostream &operator<<( std::ostream &os, glm::vec<N, T> const &v )
-{
-	for ( int i = 0; i != N; ++i ) {
-		vm::fprint( os, "{}, ", v[ i ] );
-	}
-	return os;
-}
 
 namespace glm
 {
@@ -48,6 +34,13 @@ VM_EXPORT
 	{
 		VM_DEFINE_ATTRIBUTE( vec3, min );
 		VM_DEFINE_ATTRIBUTE( vec3, max );
+
+		__host__ __device__ bool
+		  contains( vec3 const &pt ) const
+		{
+			return glm::all( glm::greaterThanEqual( pt, min ) ) &&
+				   glm::all( glm::lessThanEqual( pt, max ) );
+		}
 	};
 
 	struct Ray
@@ -65,8 +58,8 @@ VM_EXPORT
 			vec3 tmin = min( ttop, tbot );
 			vec3 tmax = max( ttop, tbot );
 
-			tnear = max( max( tmin.x, tmin.y ), tmin.z );
-			tfar = min( min( tmax.x, tmax.y ), tmax.z );
+			tnear = glm::compMax( tmin );
+			tfar = glm::compMin( tmax );
 
 			return tfar > tnear;
 		}

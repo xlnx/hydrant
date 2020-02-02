@@ -3,6 +3,7 @@
 #include <VMUtils/timer.hpp>
 #include <VMUtils/cmdline.hpp>
 #include <varch/utils/io.hpp>
+#include <cudafx/transfer.hpp>
 #include <thumbnail.hpp>
 #include "shaders/scratch.hpp"
 
@@ -43,12 +44,27 @@ int main( int argc, char **argv )
 
 	shader.bbox = Box3D{ min, max };
 	shader.th_4 = thumbnail.dim.x / 4.f;
-	thumbnail.iterate_3d(
-	  [&]( Idx const &idx ) {
-		  auto &dst = shader.thumbnail[ idx.x ][ idx.y ][ idx.z ];
-		  auto &src = thumbnail[ idx ];
-		  dst = { src.value, src.chebyshev };
-	  } );
+
+	auto device = cufx::Device::scan()[ 0 ];
+	auto thumbnail_extent = cufx::Extent{}
+							  .set_width( thumbnail.dim.x )
+							  .set_height( thumbnail.dim.y )
+							  .set_depth( thumbnail.dim.z );
+	auto thumbnail_arr = device.alloc_arraynd<float2, 3>( thumbnail_extent );
+	// vm::println( "dim = {}, thumbnail_extent = {}", thumbnail.dim, thumbnail_extent );
+	auto view_info = cufx::MemoryView2DInfo{}
+					   .set_stride( thumbnail.dim.x * sizeof( float2 ) )
+					   .set_width( thumbnail.dim.x )
+					   .set_height( thumbnail.dim.y );
+	cufx::MemoryView3D<float2> thumbnail_view( thumbnail.data(), view_info, thumbnail_extent );
+	cufx::memory_transfer( thumbnail_arr, thumbnail_view ).launch();
+	auto tex_opts = cufx::Texture::Options{}
+					  .set_address_mode( cufx::Texture::AddressMode::Border )
+					  .set_filter_mode( cufx::Texture::FilterMode::None )
+					  .set_read_mode( cufx::Texture::ReadMode::Raw )
+					  .set_normalize_coords( false );
+	cufx::Texture thumbnail_texture( thumbnail_arr, tex_opts );
+	shader.thumbnail_tex = thumbnail_texture;
 
 	auto camera = Camera{};
 	if ( a.exist( "config" ) ) {
@@ -61,9 +77,8 @@ int main( int argc, char **argv )
 		camera.set_position( x, y, z );
 	}
 
-	auto devices = cufx::Device::scan();
 	cufx::Image<typename Shader::Pixel> image( 512, 512 );
-	auto device_swap = devices[ 0 ].alloc_image_swap( image );
+	auto device_swap = device.alloc_image_swap( image );
 	auto img_view = image.view().with_device_memory( device_swap.second );
 	img_view.copy_to_device().launch();
 
