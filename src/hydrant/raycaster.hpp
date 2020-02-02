@@ -104,10 +104,30 @@ VM_EXPORT
 		}
 	};
 
-	template <typename P>
-	struct DeviceShader
+	struct Raycaster;
+
+	template <typename F>
+	struct ShaderRegisterer
 	{
+	private:
+		static void fill_opts( CastOptions &opts, cufx::ImageView<typename F::Pixel> &img, F const &f );
+
+		friend struct Raycaster;
 	};
+
+#define SHADER_DECL( F ) \
+	extern template class F
+
+#define SHADER_IMPL( F )                                                                                          \
+	template <>                                                                                                   \
+	void ShaderRegisterer<F>::fill_opts( CastOptions &opts, cufx::ImageView<typename F::Pixel> &img, F const &f ) \
+	{                                                                                                             \
+		opts.image = reinterpret_cast<char *>( &img.at_device( 0, 0 ) );                                          \
+		cudaMemcpyFromSymbol( &opts.shader, p_apply<typename F::Pixel, F>, sizeof( opts.shader ) );               \
+		opts.udata_offset = 0;                                                                                    \
+		copy_to_argument_buffer( opts.udata_offset, &f, sizeof( F ) );                                            \
+	}                                                                                                             \
+	template class F
 
 	struct Raycaster
 	{
@@ -115,7 +135,7 @@ VM_EXPORT
 		void cast( Exhibit const &e, Camera const &c, cufx::ImageView<P> &img, F const &f )
 		{
 			auto opts = get_basic_cast_opts( e, c, img );
-			CastImpl<P, F, std::is_base_of<DeviceShader<P>, F>::value>::apply( opts, img, f, this );
+			CastImpl<P, F, !std::is_function<F>::value>::apply( opts, img, f, this );
 		}
 
 	private:
@@ -188,11 +208,9 @@ VM_EXPORT
 		}
 		static void apply( CastOptions &opts, cufx::ImageView<P> &img, F const &f, Raycaster *self )
 		{
-			static_assert( std::is_trivially_copyable<F>::value, "shader must be trivally copyable" );
-			opts.image = reinterpret_cast<char *>( &img.at_device( 0, 0 ) );
-			cudaMemcpyFromSymbol( &opts.shader, p_apply<P, F>, sizeof( opts.shader ) );
-			opts.udata_offset = 0;
-			copy_to_argument_buffer( opts.udata_offset, &f, sizeof( F ) );
+			static_assert( std::is_trivially_copyable<F>::value, "shader must be trivially copyable" );
+
+			ShaderRegisterer<F>::fill_opts( opts, img, f );
 
 			auto devices = cufx::Device::scan();
 			auto kernel_block_dim = dim3( 32, 32 );
