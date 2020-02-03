@@ -3,6 +3,7 @@
 #include <VMUtils/timer.hpp>
 #include <VMUtils/cmdline.hpp>
 #include <varch/utils/io.hpp>
+#include <varch/unarchive/unarchiver.hpp>
 #include <cudafx/transfer.hpp>
 #include <thumbnail.hpp>
 #include "shaders/scratch.hpp"

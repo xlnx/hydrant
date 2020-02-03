@@ -31,7 +31,7 @@ VM_EXPORT
 		}
 		Thumbnail( std::string const &file_name )
 		{
-			std::ifstream is( file_name, ios::ate | ios::binary );
+			std::ifstream is( file_name, std::ios::ate | std::ios::binary );
 			auto len = is.tellg();
 			vol::StreamReader reader( is, 0, len );
 
