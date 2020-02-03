@@ -6,6 +6,8 @@ VM_BEGIN_MODULE( hydrant )
 
 VM_EXPORT
 {
+#define MAX_REMAINING 1
+
 	struct ScratchPixel
 	{
 		void write_to( unsigned char dst[ 4 ] )
@@ -18,7 +20,16 @@ VM_EXPORT
 		}
 
 	public:
-		glm::vec4 v;
+		struct Record
+		{
+			glm::vec4 v;
+			glm::vec3 p;
+			uint32_t n;
+		};
+
+		Record rem[ MAX_REMAINING ];
+		Record curr;
+		vec3 ray_d;
 	};
 
 	struct ScratchIntegrator

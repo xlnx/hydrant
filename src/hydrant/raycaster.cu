@@ -2,33 +2,33 @@
 
 VM_BEGIN_MODULE( hydrant )
 
-__constant__ char argument_buffer[ 4096 ];
+__constant__ char shader_args_buffer[ 4096 ];
 
-void copy_to_argument_buffer( std::size_t offset, const void *udata, std::size_t size )
+void ShaderDesc::copy_to_buffer( const void *udata, std::size_t size ) const
 {
-  cudaMemcpyToSymbol( argument_buffer, udata, size, offset );
+  cudaMemcpyToSymbol( shader_args_buffer, udata, size, offset );
 }
 
 __global__ void
-  cast_kernel_impl( CastOptions opts )
+  cast_kernel_impl( RayEmitterArguments args )
 {
   uint x = blockIdx.x * blockDim.x + threadIdx.x;
   uint y = blockIdx.y * blockDim.y + threadIdx.y;
   
-  if ( x >= opts.resolution.x || y >= opts.resolution.y ) {
+  if ( x >= args.resolution.x || y >= args.resolution.y ) {
     return;
 	}
   
-  auto cc = vec2( opts.resolution ) / 2.f;
-  auto uv = ( vec2{ x, y } - cc ) * 2.f / float( opts.resolution.y );
+  auto cc = vec2( args.resolution ) / 2.f;
+  auto uv = ( vec2{ x, y } - cc ) * 2.f / float( args.resolution.y );
   Ray ray = { 
-    opts.ray_o, 
-    normalize( vec3( opts.trans * vec4( uv.x, -uv.y, -opts.itg_fovy, 1 ) ) - opts.ray_o )
+    args.ray_o, 
+    normalize( vec3( args.trans * vec4( uv.x, -uv.y, -args.itg_fovy, 1 ) ) - args.ray_o )
   };
 
-  opts.shader( ray, 
-               opts.image + opts.pixel_size * ( opts.resolution.x * y + x ), 
-               argument_buffer + opts.udata_offset );
+  args.shader( ray, 
+               args.image + args.pixel_size * ( args.resolution.x * y + x ), 
+               shader_args_buffer + args.shader_args_offset );
 }
 
 CUFX_DEFINE_KERNEL( cast_kernel, cast_kernel_impl );
