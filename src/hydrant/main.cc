@@ -6,6 +6,7 @@
 #include <cudafx/transfer.hpp>
 #include <thumbnail.hpp>
 #include "shaders/scratch.hpp"
+#include "shaders/volume_shader.hpp"
 
 using namespace std;
 using namespace vol;
@@ -31,7 +32,7 @@ int main( int argc, char **argv )
 	auto len = is.tellg();
 	StreamReader reader( is, 0, len );
 
-	using Shader = ChebyshevShader<ScratchIntegrator>;
+	using Shader = VolumnRayEmitShader<Raymarcher>;
 
 	Thumbnail<ThumbUnit> thumbnail( reader );
 	Shader shader;

@@ -20,16 +20,17 @@ VM_EXPORT
 		}
 
 	public:
-		struct Record
-		{
-			glm::vec4 v;
-			glm::vec3 p;
-			uint32_t n;
-		};
+		// struct Record
+		// {
+		// 	glm::vec4 v;
+		// 	glm::vec3 p;
+		// 	uint32_t n;
+		// };
 
-		Record rem[ MAX_REMAINING ];
-		Record curr;
-		vec3 ray_d;
+		// Record rem[ MAX_REMAINING ];
+		// Record curr;
+		// vec3 ray_d;
+		vec4 v;
 	};
 
 	struct ScratchIntegrator

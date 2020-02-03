@@ -5,7 +5,7 @@ VM_BEGIN_MODULE( hydrant )
 VM_EXPORT
 {
 	template <typename Integrator>
-	struct ChebyshevShader : Integrator
+	struct ChebyshevShader : Integrator, RayEmitShader
 	{
 		__device__ float
 		  skip_nblock_steps( Ray &ray, glm::vec3 const &ip,
