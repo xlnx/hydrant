@@ -1,5 +1,6 @@
 #pragma once
 
+#include <fstream>
 #include <vector>
 #include <VMUtils/modules.hpp>
 #include <VMUtils/attributes.hpp>
@@ -27,6 +28,15 @@ VM_EXPORT
 		  dim( dim ),
 		  buf( dim.total() )
 		{
+		}
+		Thumbnail( std::string const &file_name )
+		{
+			std::ifstream is( file_name, ios::ate | ios::binary );
+			auto len = is.tellg();
+			vol::StreamReader reader( is, 0, len );
+
+			reader.read_typed( dim );
+			reader.read_typed( buf );
 		}
 		Thumbnail( vol::Reader &reader )
 		{

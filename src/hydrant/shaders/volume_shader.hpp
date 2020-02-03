@@ -58,8 +58,10 @@ VM_EXPORT
 		TextureAdapter thumbnail_tex;
 	};
 
-	struct Raymarcher : Integrator
+	struct VolumnRayEmitShader : RayEmitShader, Integrator
 	{
+		using Pixel = StandardVolumePixel;
+
 		__device__ int
 		  skip_nblock_steps( Ray &ray, glm::vec3 const &ip,
 							 float nblocks, float cdu, float step ) const
@@ -71,35 +73,26 @@ VM_EXPORT
 			return (int)di;
 		}
 
-		__device__ int
-		  raymarch( Ray &ray, StandardVolumePixel &pixel, float step, int nsteps ) const
-		{
-			const auto cdu = 1.f / glm::compMax( glm::abs( ray.d ) );
-
-			int i;
-			for ( i = 0; i < nsteps; ++i ) {
-				vec3 ip = floor( ray.o );
-				if ( float cd = this->chebyshev( ip ) ) {
-					i += skip_nblock_steps( ray, ip, cd, cdu, step );
-				} else if ( !this->integrate( ray.o, ip, pixel ) ) {
-					break;
-				}
-				ray.o += ray.d * step;
-			}
-
-			return nsteps - i;
-		}
-	};
-
-	template <typename Raymarcher>
-	struct VolumnRayEmitShader : RayEmitShader, Raymarcher
-	{
-		using Pixel = StandardVolumePixel;
-
 		__device__ void
 		  apply( Ray const &ray_in, Pixel &pixel_out ) const
 		{
+#define MAXX ( 8 )
+			__shared__ uvec3 absent_coord[ MAXX ][ MAXX ][ MAXX ];
+			__shared__ bool is_absent[ MAXX ][ MAXX ][ MAXX ];
+			__shared__ int wg_emit_cnt;
+
+			bool is_worker = threadIdx.x < MAXX && threadIdx.y < MAXX;
+			if ( is_worker ) {
+				for ( int i = 0; i != MAXX; ++i ) {
+					is_absent[ threadIdx.y ][ threadIdx.x ][ i ] = false;
+				}
+			}
+			wg_emit_cnt = 0;
+
+			__syncthreads();
+
 			const auto step = 1e-2f * th_4;
+			const auto cdu = 1.f / glm::compMax( glm::abs( ray_in.d ) );
 
 			auto ray = ray_in;
 			auto pixel = pixel_out;
@@ -107,39 +100,82 @@ VM_EXPORT
 			if ( ray.intersect( bbox, tnear, tfar ) ) {
 				ray.o += ray.d * tnear;
 				auto nsteps = min( max_steps, int( ( tfar - tnear ) / step ) );
+
+				int i;
+				for ( i = 0; i < nsteps; ++i ) {
+					vec3 ip = floor( ray.o );
+					if ( float cd = this->chebyshev( ip ) ) {
+						i += skip_nblock_steps( ray, ip, cd, cdu, step );
+					} else {
+						ivec3 ipm = mod( ip, vec3( MAXX ) );
+						absent_coord[ ipm.x ][ ipm.y ][ ipm.z ] = ip;
+						is_absent[ ipm.x ][ ipm.y ][ ipm.z ] = true;
+						if ( !this->integrate( ray.o, ip, pixel ) ) {
+							break;
+						}
+					}
+					ray.o += ray.d * step;
+				}
+
+				pixel.nsteps = nsteps - i;
 				pixel.ray = ray;
-				pixel.nsteps = this->raymarch( ray, pixel, step, nsteps );
 			} else {
 				pixel.nsteps = 0;
 			}
 			pixel_out = pixel;
+
+			__syncthreads();
+
+			int wg_id = blockIdx.x + blockIdx.y * blockDim.x;
+			char *wg_base_ptr = absent_buf.ptr() + wg_len_bytes * wg_id;
+			int *wg_emit_cnt_ptr = (int *)wg_base_ptr;
+			uvec3 *wg_ptr = (uvec3 *)( wg_base_ptr + sizeof( int ) );
+
+			if ( is_worker ) {
+				for ( int i = 0; i != MAXX; ++i ) {
+					if ( is_absent[ threadIdx.y ][ threadIdx.x ][ i ] ) {
+						auto old = atomicAdd( &wg_emit_cnt, 1 );
+						if ( old < wg_max_emit_cnt ) {
+							wg_ptr[ old ] = absent_coord[ threadIdx.y ][ threadIdx.x ][ i ];
+						}
+					}
+				}
+			}
+
+			__syncthreads();
+
+			if ( threadIdx.x == 0 && threadIdx.y == 0 ) {
+				*wg_emit_cnt_ptr = min( wg_emit_cnt, wg_max_emit_cnt );
+			}
 		}
 
 	public:
 		Box3D bbox;
 		float th_4;
 		int max_steps = 500;
+
+		cufx::MemoryView1D<char> absent_buf;
+		int wg_max_emit_cnt;
+		int wg_len_bytes;
 	};
 
-	struct VolumePixelShader : PixelShader, Raymarcher
-	{
-		__device__ void
-		  apply( Pixel &pixel_in_out ) const
-		{
-			// pixel_in_out.
-			// for ( int i = 0; i < nsteps; ++i ) {
-			// 	ray.o += ray.d * step;
-			// 	glm::vec3 ip = floor( ray.o );
-			// 	if ( float cd = this->chebyshev( ip ) ) {
-			// 		i += skip_nblock_steps( ray, ip, cd, cdu, step );
-			// 	} else if ( !this->integrate( ray.o, ip, pixel ) ) {
-			// 		break;
-			// 	}
-			// }
-		}
-	};
-
-	SHADER_DECL( VolumnRayEmitShader<Raymarcher> );
+	// struct VolumePixelShader : PixelShader
+	// {
+	// 	__device__ void
+	// 	  apply( Pixel &pixel_in_out ) const
+	// 	{
+	// 		// pixel_in_out.
+	// 		// for ( int i = 0; i < nsteps; ++i ) {
+	// 		// 	ray.o += ray.d * step;
+	// 		// 	glm::vec3 ip = floor( ray.o );
+	// 		// 	if ( float cd = this->chebyshev( ip ) ) {
+	// 		// 		i += skip_nblock_steps( ray, ip, cd, cdu, step );
+	// 		// 	} else if ( !this->integrate( ray.o, ip, pixel ) ) {
+	// 		// 		break;
+	// 		// 	}
+	// 		// }
+	// 	}
+	// };
 }
 
 VM_END_MODULE()

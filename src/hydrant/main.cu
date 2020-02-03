@@ -31,10 +31,10 @@ int main( int argc, char **argv )
 	ifstream is( in, ios::ate | ios::binary );
 	auto len = is.tellg();
 	StreamReader reader( is, 0, len );
+	Unarchiver unarchiver( reader );
+	Thumbnail<ThumbUnit> thumbnail( in + ".thumb" );
 
-	using Shader = VolumnRayEmitShader<Raymarcher>;
-
-	Thumbnail<ThumbUnit> thumbnail( reader );
+	using Shader = VolumnRayEmitShader;
 	Shader shader;
 
 	glm::vec3 min = { 0, 0, 0 };
@@ -83,6 +83,14 @@ int main( int argc, char **argv )
 	auto img_view = image.view().with_device_memory( device_swap.second );
 	img_view.copy_to_device().launch();
 
+	auto wg_cnt = 32 * 32;
+	shader.wg_max_emit_cnt = 8;
+	shader.wg_len_bytes = sizeof(int) + 
+						  shader.wg_max_emit_cnt * sizeof( glm::uvec3 );
+	auto global = device.alloc_global( shader.wg_len_bytes * wg_cnt );
+	vector<char> absent( global.size() );
+	shader.absent_buf = global.view_1d<char>( global.size() );
+
 	Raycaster raycaster;
 	{
 		std::atomic_uint64_t total_steps( 0 );
@@ -92,6 +100,33 @@ int main( int argc, char **argv )
 		} );
 
 		raycaster.cast( exhibit, camera, img_view, shader );
+
+		cufx::memory_transfer( cufx::MemoryView1D<char>( absent ), shader.absent_buf ).launch();
+		vector<Idx> block_idxs;
+
+		for ( int i = 0; i != wg_cnt; ++i ) {
+			auto wg_base_ptr = absent.data() + i * shader.wg_len_bytes;
+			int wg_emit_cnt = *(int*)wg_base_ptr;
+			glm::uvec3 *wg_ptr = (glm::uvec3 *)(wg_base_ptr + sizeof(int));
+			for ( int j = 0; j != wg_emit_cnt; ++j ) {
+				block_idxs.emplace_back( Idx{}
+										  .set_x( wg_ptr[ j ].x )
+										  .set_y( wg_ptr[ j ].y )
+										  .set_z( wg_ptr[ j ].z ) );
+			}
+			// if ( wg_emit_cnt ) {
+			// 	vm::println( "#{} : wg_emit_cnt = {}", i, wg_emit_cnt );
+			// 		vm::println( "{}", wg_ptr[ j ] );
+			// 	}
+			// }
+		}
+		std::sort( block_idxs.begin(), block_idxs.end() );
+		auto last = std::unique( block_idxs.begin(), block_idxs.end() );
+		block_idxs.erase( last, block_idxs.end() );
+	
+		// for (int j = 0; j != block_idxs.size(); ++j) {
+		// 	vm::println("{}", block_idxs[j]);
+		// }
 	}
 
 	img_view.copy_from_device().launch();

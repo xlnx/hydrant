@@ -140,9 +140,6 @@ struct ShaderRegisterer : ShaderRegistererImpl<
 {
 };
 
-#define SHADER_DECL( F ) \
-	extern template class F
-
 #define SHADER_IMPL( F )                                             \
 	template <>                                                      \
 	ShaderDesc make_shader_desc<F>( F const &f, std::size_t offset ) \
@@ -152,7 +149,6 @@ struct ShaderRegisterer : ShaderRegistererImpl<
 		ShaderRegisterer<F>::apply( desc, f );                       \
 		desc.copy_to_buffer( &f, sizeof( f ) );                      \
 		return desc;                                                 \
-	}                                                                \
-	template class F
+	}
 
 VM_END_MODULE()

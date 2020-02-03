@@ -60,7 +60,7 @@ VM_EXPORT
 		TextureAdapter thumbnail_tex;
 	};
 
-	SHADER_DECL( ChebyshevShader<ScratchIntegrator> );
+	// SHADER_DECL( ChebyshevShader<ScratchIntegrator> );
 }
 
 VM_END_MODULE()
