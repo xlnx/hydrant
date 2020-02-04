@@ -33,6 +33,7 @@ int main( int argc, char **argv )
 	auto len = is.tellg();
 	StreamReader reader( is, 0, len );
 	Unarchiver unarchiver( reader );
+
 	Thumbnail<ThumbUnit> thumbnail( in + ".thumb" );
 
 	using Shader = VolumnRayEmitShader;
@@ -92,6 +93,8 @@ int main( int argc, char **argv )
 	vector<char> absent( global.size() );
 	shader.absent_buf = global.view_1d<char>( global.size() );
 
+	glm::uvec3 dim = { thumbnail.dim.x, thumbnail.dim.y, thumbnail.dim.z };
+
 	Raycaster raycaster;
 	{
 		std::atomic_uint64_t total_steps( 0 );
@@ -110,10 +113,12 @@ int main( int argc, char **argv )
 			int wg_emit_cnt = *(int*)wg_base_ptr;
 			glm::uvec3 *wg_ptr = (glm::uvec3 *)(wg_base_ptr + sizeof(int));
 			for ( int j = 0; j != wg_emit_cnt; ++j ) {
-				block_idxs.emplace_back( Idx{}
-										  .set_x( wg_ptr[ j ].x )
-										  .set_y( wg_ptr[ j ].y )
-										  .set_z( wg_ptr[ j ].z ) );
+				if ( glm::all( glm::lessThan( wg_ptr[ j ], dim ) ) ) {
+					block_idxs.emplace_back( Idx{}
+											.set_x( wg_ptr[ j ].x )
+											.set_y( wg_ptr[ j ].y )
+											.set_z( wg_ptr[ j ].z ) ); 
+				}
 			}
 			// if ( wg_emit_cnt ) {
 			// 	vm::println( "#{} : wg_emit_cnt = {}", i, wg_emit_cnt );
@@ -126,10 +131,6 @@ int main( int argc, char **argv )
 		block_idxs.erase( last, block_idxs.end() );
 
 		unarchiver.unarchive( block_idxs, []( Idx const &idx, VoxelStreamPacket const &) {} );
-	
-		// for (int j = 0; j != block_idxs.size(); ++j) {
-		// 	vm::println("{}", block_idxs[j]);
-		// }
 	}
 
 	img_view.copy_from_device().launch();
