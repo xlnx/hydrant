@@ -124,6 +124,8 @@ int main( int argc, char **argv )
 		std::sort( block_idxs.begin(), block_idxs.end() );
 		auto last = std::unique( block_idxs.begin(), block_idxs.end() );
 		block_idxs.erase( last, block_idxs.end() );
+
+		unarchiver.unarchive( block_idxs, []( Idx const &idx, VoxelStreamPacket const &) {} );
 	
 		// for (int j = 0; j != block_idxs.size(); ++j) {
 		// 	vm::println("{}", block_idxs[j]);
