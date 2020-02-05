@@ -14,6 +14,11 @@ VM_EXPORT
 			cu = tex.get();
 			return *this;
 		}
+		TextureAdapter &operator=( cudaTextureObject_t const &tex )
+		{
+			cu = tex;
+			return *this;
+		}
 
 	public:
 		template <typename T, typename E>

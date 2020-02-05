@@ -56,6 +56,7 @@ VM_EXPORT
 
 	public:
 		TextureAdapter thumbnail_tex;
+		TextureAdapter cache_tex;
 	};
 
 	struct VolumnRayEmitShader : RayEmitShader, Integrator

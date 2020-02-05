@@ -6,6 +6,8 @@
 #include <varch/unarchive/unarchiver.hpp>
 #include <cudafx/transfer.hpp>
 #include <thumbnail.hpp>
+#include <texture3d.hpp>
+#include <buffer3d.hpp>
 #include "shaders/scratch.hpp"
 #include "shaders/volume_shader.hpp"
 
@@ -28,46 +30,93 @@ int main( int argc, char **argv )
 
 	auto in = a.get<string>( "in" );
 	auto out = a.get<string>( "out" );
+	auto device = cufx::Device::scan()[ 0 ];
+
+	using Shader = VolumnRayEmitShader;
+	Shader shader;
+
+	cufx::Image<typename Shader::Pixel> image( 512, 512 );
+	auto device_swap = device.alloc_image_swap( image );
+	auto img_view = image.view().with_device_memory( device_swap.second );
+	img_view.copy_to_device().launch();
+
+	/* input file */
 
 	ifstream is( in, ios::ate | ios::binary );
 	auto len = is.tellg();
 	StreamReader reader( is, 0, len );
 	Unarchiver unarchiver( reader );
-
 	Thumbnail<ThumbUnit> thumbnail( in + ".thumb" );
 
-	using Shader = VolumnRayEmitShader;
-	Shader shader;
+	glm::uvec3 dim = { unarchiver.dim().x, unarchiver.dim().y, unarchiver.dim().z };
+	glm::uvec3 bdim = { unarchiver.block_size(), unarchiver.block_size(), unarchiver.block_size() };
+
+	/* thumbnail texture */
+
+	Texture3D<float2> thumbnail_texture(
+	  device, reinterpret_cast<float2*>( thumbnail.data() ), dim,
+	  cufx::Texture::Options::as_array() );
+	shader.thumbnail_tex = thumbnail_texture.get();
+
+	/* cache texture */
+
+	auto props = device.props();
+	glm::uvec3 tex3d_max_dim = { props.maxTexture3D[ 0 ],
+								 props.maxTexture3D[ 1 ],
+								 props.maxTexture3D[ 2 ] };
+	Buffer3D<uint3> cache_buf( tex3d_max_dim / bdim );
+	Texture3D<uint3> cache_texture(
+	  device, cache_buf.data(), cache_buf.dim(),
+	  cufx::Texture::Options::as_array() );
+	shader.cache_tex = cache_texture.get();
+
+	/* absent buffer */
+
+	auto wg_cnt = 32 * 32;
+	shader.wg_max_emit_cnt = 8;
+	shader.wg_len_bytes = sizeof( int ) +
+						  shader.wg_max_emit_cnt * sizeof( glm::uvec3 );
+	auto absent_glob = device.alloc_global( shader.wg_len_bytes * wg_cnt );
+	vector<char> absent( absent_glob.size() );
+	shader.absent_buf = absent_glob.view_1d<char>( absent_glob.size() );
+
+	/* block buffer */
+
+	auto block_size = unarchiver.block_size();
+	auto block_bytes = block_size * block_size * block_size;
+	auto block_glob = device.alloc_global( block_bytes );
+	auto block_view_1d = block_glob.view_1d<unsigned char>( block_bytes );
+	auto block_view_info = cufx::MemoryView2DInfo{}
+							 .set_stride( block_size * sizeof( unsigned char ) )
+							 .set_width( block_size )
+							 .set_height( block_size );
+	auto block_extent = cufx::Extent{}
+						  .set_width( block_size )
+						  .set_height( block_size )
+						  .set_depth( block_size );
+	auto block_view_3d = block_glob.view_3d<unsigned char>( block_view_info, block_extent );
+
+	auto sampler_extent = cufx::Extent{}
+							.set_width( block_size )
+							.set_height( block_size )
+							.set_depth( block_size );
+	auto sampler_arr = device.alloc_arraynd<unsigned char, 3>( sampler_extent );
+	// cufx::MemoryView3D<float2> thumbnail_view( thumbnail.data(), thumbnail_view_info, thumbnail_extent );
+	cufx::memory_transfer( sampler_arr, block_view_3d, cudaPos{ 0, 0, 0 } ).launch();
+	cufx::Texture sampler_texture( sampler_arr, cufx::Texture::Options::as_array() );
+
+	/* exhibit */
 
 	glm::vec3 min = { 0, 0, 0 };
-	glm::vec3 max = { thumbnail.dim.x, thumbnail.dim.y, thumbnail.dim.z };
+	glm::vec3 max = { dim.x, dim.y, dim.z };
 	auto exhibit = Exhibit{}
 					 .set_center( max / 2.f )
 					 .set_size( max );
 
 	shader.bbox = Box3D{ min, max };
-	shader.th_4 = thumbnail.dim.x / 4.f;
+	shader.th_4 = dim.x / 4.f;
 
-	auto device = cufx::Device::scan()[ 0 ];
-	auto thumbnail_extent = cufx::Extent{}
-							  .set_width( thumbnail.dim.x )
-							  .set_height( thumbnail.dim.y )
-							  .set_depth( thumbnail.dim.z );
-	auto thumbnail_arr = device.alloc_arraynd<float2, 3>( thumbnail_extent );
-	// vm::println( "dim = {}, thumbnail_extent = {}", thumbnail.dim, thumbnail_extent );
-	auto view_info = cufx::MemoryView2DInfo{}
-					   .set_stride( thumbnail.dim.x * sizeof( float2 ) )
-					   .set_width( thumbnail.dim.x )
-					   .set_height( thumbnail.dim.y );
-	cufx::MemoryView3D<float2> thumbnail_view( thumbnail.data(), view_info, thumbnail_extent );
-	cufx::memory_transfer( thumbnail_arr, thumbnail_view ).launch();
-	auto tex_opts = cufx::Texture::Options{}
-					  .set_address_mode( cufx::Texture::AddressMode::Border )
-					  .set_filter_mode( cufx::Texture::FilterMode::None )
-					  .set_read_mode( cufx::Texture::ReadMode::Raw )
-					  .set_normalize_coords( false );
-	cufx::Texture thumbnail_texture( thumbnail_arr, tex_opts );
-	shader.thumbnail_tex = thumbnail_texture;
+	/* camera */
 
 	auto camera = Camera{};
 	if ( a.exist( "config" ) ) {
@@ -79,21 +128,6 @@ int main( int argc, char **argv )
 		auto z = a.get<float>( "z" );
 		camera.set_position( x, y, z );
 	}
-
-	cufx::Image<typename Shader::Pixel> image( 512, 512 );
-	auto device_swap = device.alloc_image_swap( image );
-	auto img_view = image.view().with_device_memory( device_swap.second );
-	img_view.copy_to_device().launch();
-
-	auto wg_cnt = 32 * 32;
-	shader.wg_max_emit_cnt = 8;
-	shader.wg_len_bytes = sizeof(int) + 
-						  shader.wg_max_emit_cnt * sizeof( glm::uvec3 );
-	auto global = device.alloc_global( shader.wg_len_bytes * wg_cnt );
-	vector<char> absent( global.size() );
-	shader.absent_buf = global.view_1d<char>( global.size() );
-
-	glm::uvec3 dim = { thumbnail.dim.x, thumbnail.dim.y, thumbnail.dim.z };
 
 	Raycaster raycaster;
 	{
@@ -110,14 +144,14 @@ int main( int argc, char **argv )
 
 		for ( int i = 0; i != wg_cnt; ++i ) {
 			auto wg_base_ptr = absent.data() + i * shader.wg_len_bytes;
-			int wg_emit_cnt = *(int*)wg_base_ptr;
-			glm::uvec3 *wg_ptr = (glm::uvec3 *)(wg_base_ptr + sizeof(int));
+			int wg_emit_cnt = *(int *)wg_base_ptr;
+			glm::uvec3 *wg_ptr = (glm::uvec3 *)( wg_base_ptr + sizeof( int ) );
 			for ( int j = 0; j != wg_emit_cnt; ++j ) {
 				if ( glm::all( glm::lessThan( wg_ptr[ j ], dim ) ) ) {
 					block_idxs.emplace_back( Idx{}
-											.set_x( wg_ptr[ j ].x )
-											.set_y( wg_ptr[ j ].y )
-											.set_z( wg_ptr[ j ].z ) ); 
+											   .set_x( wg_ptr[ j ].x )
+											   .set_y( wg_ptr[ j ].y )
+											   .set_z( wg_ptr[ j ].z ) );
 				}
 			}
 			// if ( wg_emit_cnt ) {
@@ -130,7 +164,18 @@ int main( int argc, char **argv )
 		auto last = std::unique( block_idxs.begin(), block_idxs.end() );
 		block_idxs.erase( last, block_idxs.end() );
 
-		unarchiver.unarchive( block_idxs, []( Idx const &idx, VoxelStreamPacket const &) {} );
+		unsigned nbytes = 0;
+		unarchiver.unarchive(
+		  block_idxs,
+		  [&]( Idx const &idx, VoxelStreamPacket const &pkt ) {
+			  pkt.append_to( block_view_1d );
+			  nbytes += pkt.length;
+			  if ( nbytes >= block_bytes ) {
+				  // vm::println( "done {}", idx );
+				  nbytes = 0;
+			  }
+		  } );
+		// unarchiver.unarchive( block_idxs, []( Idx const &idx, VoxelStreamPacket const &) {} );
 	}
 
 	img_view.copy_from_device().launch();
