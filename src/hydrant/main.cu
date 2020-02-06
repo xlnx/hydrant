@@ -120,30 +120,6 @@ int main( int argc, char **argv )
 
 #pragma endregion
 
-	/* cache texture */
-
-	const auto cache_dim = glm::uvec3( 8 );
-	// auto props = device.props();
-	// glm::uvec3 tex3d_max_dim = { props.maxTexture3D[ 0 ],
-	// 							 props.maxTexture3D[ 1 ],
-	// 							 props.maxTexture3D[ 2 ] };
-	// glm::uvec3 cache_dim = tex3d_max_dim / bdim;
-	// Buffer3D<int> cache_buf( cache_dim );
-	// auto cache_extent = cufx::Extent{}
-	// 						.set_width( cache_dim.x )
-	// 						.set_height( cache_dim.y )
-	// 						.set_depth( cache_dim.z );
-	// auto cache_arr = device.alloc_arraynd<int, 3>( cache_extent );
-	// // vm::println( "cache_dim = {}, cache_extent = {}", cache_dim, cache_extent );
-	// auto cache_view_info = cufx::MemoryView2DInfo{}
-	// 				.set_stride( cache_dim.x * sizeof( int ) )
-	// 				.set_width( cache_dim.x )
-	// 				.set_height( cache_dim.y );
-	// cufx::MemoryView3D<int> cache_view( cache_buf.data(), cache_view_info, cache_extent );
-	// cufx::memory_transfer( cache_arr, cache_view ).launch();
-	// cufx::Texture cache_texture( cache_arr, cufx::Texture::Options::as_array() );
-	// shader.cache_tex = cache_texture;
-
 	/* absent buffer */
 #pragma region
 
@@ -183,12 +159,12 @@ int main( int argc, char **argv )
 	auto block_idxs = thumbnail.present_block_idxs();
 	vector<glm::vec3> block_ccs( block_idxs.size() );
 	std::transform( block_idxs.begin(), block_idxs.end(), block_ccs.begin(),
-		[](Idx const &idx){ return glm::vec3(idx.x, idx.y, idx.z) + 0.5f; });
+					[]( Idx const &idx ) { return glm::vec3( idx.x, idx.y, idx.z ) + 0.5f; } );
 	vector<int> pidx( block_idxs.size() );
 	for ( int i = 0; i != pidx.size(); ++i ) { pidx[ i ] = i; }
 	vm::println( "{}", block_idxs.size() );
 
-	vm::println("{}", pidx);
+	vm::println( "{}", pidx );
 
 	auto et = exhibit.get_matrix();
 
@@ -196,65 +172,82 @@ int main( int argc, char **argv )
 	// raycaster.cast( exhibit, camera, img_view, shader );
 	int nframes = 1;
 	while ( nframes-- ) {
+		std::size_t ns = 0, ns1 = 0;
+
 		vm::Timer::Scoped timer( [&]( auto dt ) {
-			vm::println( "time: {}", dt.ms() );
+			vm::println( "time: {} / {} / {}", dt.ms(),
+						 ns / 1000 / 1000,
+						 ns1 / 1000 / 1000 );
 		} );
 
 		glm::vec3 cp = et * glm::vec4( camera.position, 1 );
 		vm::println( "{}", cp );
 
-		std::sort(pidx.begin(), pidx.end(), 
-			[&](int x, int y) {
-				return glm::distance( block_ccs[x], cp ) < 
-					glm::distance( block_ccs[y], cp );
-			});
+		std::sort( pidx.begin(), pidx.end(),
+				   [&]( int x, int y ) {
+					   return glm::distance( block_ccs[ x ], cp ) <
+							  glm::distance( block_ccs[ y ], cp );
+				   } );
 
-			vm::println("{}", pidx);
+		vm::println( "{}", pidx );
 
 		for ( int i = 0; i < pidx.size(); i += MAX_CACHE_SIZE ) {
 			vector<Idx> idxs;
 			for ( int j = i; j < i + MAX_CACHE_SIZE && j < pidx.size(); ++j ) {
 				idxs.emplace_back( block_idxs[ pidx[ j ] ] );
 			}
-			
+
 			int nbytes = 0, blkid = 0;
 			vector<cufx::Texture> cache_texs;
 			memset( present_buf.data(), -1, present_buf.bytes() );
 
-			unarchiver.unarchive(
-			  idxs,
-			  [&]( Idx const &idx, VoxelStreamPacket const &pkt ) {
-				  pkt.append_to( block_view_1d );
-				  nbytes += pkt.length;
-				  if ( nbytes >= block_bytes ) {
-					  // vm::println( "done {}", idx );
-					  cufx::memory_transfer( cache_block_arr[ blkid ], block_view_3d ).launch();
-					//   if ( blkid == 0 ) {
-					  cache_texs.emplace_back( cache_block_arr[ blkid ], 
-						cufx::Texture::Options{}
-							.set_address_mode( cufx::Texture::AddressMode::Wrap )
-							.set_filter_mode( cufx::Texture::FilterMode::Linear )
-							.set_read_mode( cufx::Texture::ReadMode::NormalizedFloat )
-							.set_normalize_coords( true ) );
-					  present_buf[ glm::vec3( idx.x, idx.y, idx.z ) ] = blkid;
-					  nbytes = 0; blkid += 1;
-					//   }
-				  }
-			  } );
-			
+			{
+				vm::Timer::Scoped timer( [&]( auto dt ) {
+					ns += dt.ns().cnt();
+				} );
+
+				unarchiver.unarchive(
+				  idxs,
+				  [&]( Idx const &idx, VoxelStreamPacket const &pkt ) {
+					  pkt.append_to( block_view_1d );
+					  nbytes += pkt.length;
+					  if ( nbytes >= block_bytes ) {
+						  // vm::println( "done {}", idx );
+						  cufx::memory_transfer( cache_block_arr[ blkid ], block_view_3d ).launch();
+						  //   if ( blkid == 0 ) {
+						  cache_texs.emplace_back( cache_block_arr[ blkid ],
+												   cufx::Texture::Options{}
+													 .set_address_mode( cufx::Texture::AddressMode::Wrap )
+													 .set_filter_mode( cufx::Texture::FilterMode::Linear )
+													 .set_read_mode( cufx::Texture::ReadMode::NormalizedFloat )
+													 .set_normalize_coords( true ) );
+						  present_buf[ glm::vec3( idx.x, idx.y, idx.z ) ] = blkid;
+						  nbytes = 0;
+						  blkid += 1;
+						  //   }
+					  }
+				  } );
+			}
+
 			cufx::memory_transfer( present_arr, present_view ).launch();
 			cufx::Texture present_texture( present_arr, cufx::Texture::Options::as_array() );
 			shader.present_tex = present_texture;
-			
+
 			// vm::println( "{}", cache_texs.size() );
 			for ( int j = 0; j != cache_texs.size(); ++j ) {
 				shader.cache_tex[ j ] = cache_texs[ j ];
 			}
 
-			if ( i == 0 ) {
-				raycaster.cast( exhibit, camera, img_view, shader );
-			} else {
-				raycaster.cast( img_view, reinterpret_cast<VolumePixelShader &>( shader ) );
+			{
+				vm::Timer::Scoped timer( [&]( auto dt ) {
+					ns1 += dt.ns().cnt();
+				} );
+
+				if ( i == 0 ) {
+					raycaster.cast( exhibit, camera, img_view, shader );
+				} else {
+					raycaster.cast( img_view, reinterpret_cast<VolumePixelShader &>( shader ) );
+				}
 			}
 		}
 	}
