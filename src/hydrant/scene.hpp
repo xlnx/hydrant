@@ -33,6 +33,17 @@ VM_EXPORT
 	{
 		VM_DEFINE_ATTRIBUTE( vec3, size );
 		VM_DEFINE_ATTRIBUTE( vec3, center );
+
+		mat4 get_matrix() const
+		{
+			auto d = max( abs( center - size ), abs( center ) );
+			float scale = glm::compMax( d );
+			mat4 et = { { scale, 0, 0, 0 },
+						{ 0, scale, 0, 0 },
+						{ 0, 0, scale, 0 },
+						{ center.x, center.y, center.z, 1 } };
+			return et;
+		}
 	};
 
 	struct Camera

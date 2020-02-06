@@ -21,12 +21,7 @@ VM_EXPORT
 		template <typename P, typename F>
 		void cast( Exhibit const &e, Camera const &c, cufx::ImageView<P> &img, F const &f )
 		{
-			auto d = max( abs( e.center - e.size ), abs( e.center ) );
-			float scale = glm::compMax( d );
-			mat4 et = { { scale, 0, 0, 0 },
-						{ 0, scale, 0, 0 },
-						{ 0, 0, scale, 0 },
-						{ e.center.x, e.center.y, e.center.z, 1 } };
+			auto et = e.get_matrix();
 			auto ivt = inverse( c.get_matrix() );
 
 			RayEmitKernelArgs args;
@@ -39,6 +34,10 @@ VM_EXPORT
 
 			CastImpl<P, F, true>::apply( args, img, f, this );
 		}
+		static int round_up_div( int a, int b )
+		{
+			return a % b == 0 ? a / b : a / b + 1;
+		}
 		template <typename P, typename F>
 		void cast( cufx::ImageView<P> &img, F const &f )
 		{
@@ -46,7 +45,13 @@ VM_EXPORT
 			args.image = make_image_desc( img );
 			args.shader = make_shader_desc( f, 0 );
 
-			CastImpl<P, F, true>::apply( args, img, f, this );
+			auto kernel_block_dim = dim3( 32, 32 );
+			auto launch_info = cufx::KernelLaunchInfo{}
+								 .set_device( cufx::Device::scan()[ 0 ] )
+								 .set_grid_dim( round_up_div( args.image.resolution.x, kernel_block_dim.x ),
+												round_up_div( args.image.resolution.y, kernel_block_dim.y ) )
+								 .set_block_dim( kernel_block_dim );
+			pixel_kernel( launch_info, args ).launch();
 		}
 
 	private:

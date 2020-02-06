@@ -2,6 +2,8 @@
 #include <texture_adapter.hpp>
 #include "../shader.hpp"
 
+#define MAX_CACHE_SIZE ( 64 )
+
 VM_BEGIN_MODULE( hydrant )
 
 VM_EXPORT
@@ -10,7 +12,7 @@ VM_EXPORT
 	{
 		void write_to( unsigned char dst[ 4 ] )
 		{
-			auto v = glm::clamp( this->v * 255.f, vec4( 0.f ), vec4( 255.f ) );
+			auto v = clamp( this->v * 255.f, vec4( 0.f ), vec4( 255.f ) );
 			dst[ 0 ] = (unsigned char)( v.x );
 			dst[ 1 ] = (unsigned char)( v.y );
 			dst[ 2 ] = (unsigned char)( v.z );
@@ -31,40 +33,18 @@ VM_EXPORT
 		int nsteps;
 	};
 
-	struct Integrator
+	struct VolumeShader
 	{
 		using Pixel = StandardVolumePixel;
 
-		__device__ bool
-		  integrate( glm::vec3 const &p, glm::vec3 const &ip, StandardVolumePixel &pixel ) const
-		{
-			const auto opacity_threshold = 0.95f;
-			const auto density = 3e-4f;
-
-			auto val = glm::vec4( thumbnail_tex.sample_3d<float2>( ip ).x );
-			auto col = glm::vec4( ip, 1 ) * val * density;
-			pixel.v += col * ( 1.f - pixel.v.w );
-
-			return pixel.v.y <= opacity_threshold;
-		}
-
 		__device__ float
-		  chebyshev( glm::vec3 const &ip ) const
+		  chebyshev( vec3 const &ip ) const
 		{
 			return thumbnail_tex.sample_3d<float2>( ip ).y;
 		}
 
-	public:
-		TextureAdapter thumbnail_tex;
-		TextureAdapter cache_tex;
-	};
-
-	struct VolumnRayEmitShader : RayEmitShader, Integrator
-	{
-		using Pixel = StandardVolumePixel;
-
 		__device__ int
-		  skip_nblock_steps( Ray &ray, glm::vec3 const &ip,
+		  skip_nblock_steps( Ray &ray, vec3 const &ip,
 							 float nblocks, float cdu, float step ) const
 		{
 			float tnear, tfar;
@@ -75,7 +55,7 @@ VM_EXPORT
 		}
 
 		__device__ void
-		  apply( Ray const &ray_in, Pixel &pixel_out ) const
+		  raymarch( Pixel &pixel_in_out ) const
 		{
 #define MAXX ( 8 )
 			__shared__ uvec3 absent_coord[ MAXX ][ MAXX ][ MAXX ];
@@ -92,38 +72,63 @@ VM_EXPORT
 
 			__syncthreads();
 
-			const auto step = 1e-2f * th_4;
-			const auto cdu = 1.f / glm::compMax( glm::abs( ray_in.d ) );
+			const auto cdu = 1.f / compMax( abs( pixel_in_out.ray.d ) );
+			const auto opacity_threshold = 0.95f;
+			const auto density = 1e-1f;
 
-			auto ray = ray_in;
-			auto pixel = pixel_out;
-			float tnear, tfar;
-			if ( ray.intersect( bbox, tnear, tfar ) ) {
-				ray.o += ray.d * tnear;
-				auto nsteps = min( max_steps, int( ( tfar - tnear ) / step ) );
+			auto pixel = pixel_in_out;
+			auto &ray = pixel.ray;
+			auto &nsteps = pixel.nsteps;
 
-				int i;
-				for ( i = 0; i < nsteps; ++i ) {
-					vec3 ip = floor( ray.o );
+			while ( nsteps > 0 ) {
+				vec3 ip = floor( ray.o );
+				if ( all( greaterThanEqual( ip, bbox.min ) ) &&
+					 all( lessThan( ip, bbox.max ) ) ) {
 					if ( float cd = this->chebyshev( ip ) ) {
-						i += skip_nblock_steps( ray, ip, cd, cdu, step );
+						nsteps -= skip_nblock_steps( ray, ip, cd, cdu, step );
 					} else {
-						ivec3 ipm = mod( ip, vec3( MAXX ) );
-						absent_coord[ ipm.x ][ ipm.y ][ ipm.z ] = ip;
-						is_absent[ ipm.x ][ ipm.y ][ ipm.z ] = true;
-						if ( !this->integrate( ray.o, ip, pixel ) ) {
+						// ivec3 ip_cache = mod( ip, vec3( 8 ) );
+						// auto &cache_unit = cache[ ip_cache.x ][ ip_cache.y ][ ip_cache.z ];
+						// if ( cache_unit.ip == ivec3( ip ) ) {
+						auto present_id = present_tex.sample_3d<int>( ip );
+						// if ( threadIdx.x == 0 && threadIdx.y == 0 ) {
+						// 	printf( "%d,%d,%d,%d == %d,%d,%d: %f,%f,%f(%d) %d\n",
+						// 			blockIdx.x, blockIdx.y, threadIdx.x, threadIdx.y,
+						// 			ivec3( ip ).x, ivec3( ip ).y, ivec3( ip ).z,
+						// 			ray.o.x, ray.o.y, ray.o.z,
+						// 			pixel.nsteps, present_id );
+						// }
+						if ( present_id != -1 ) {
+							auto pt = ( cache_du.x + ( ray.o - ip ) ) * cache_du.y;
+							auto val = vec4( cache_tex[ present_id ].sample_3d<float>( pt ) );
+							// auto val = vec4( ray.o - ip, 1 );
+							// auto val = vec4( thumbnail_tex.sample_3d<float2>( ip ).x );
+							auto col = val * density;
+							pixel.v += col * ( 1.f - pixel.v.w );
+							if ( pixel.v.w > opacity_threshold ) {
+								break;
+							}
+						} else {
+							// if ( cache_unit.ip != ivec3( -1 ) && ip_cache == ivec3( 1, 6, 3 ) ) {
+							// if ( uvec4( blockIdx.x, blockIdx.y, threadIdx.x, threadIdx.y ) == uvec4( 11, 9, 19, 28 ) ||
+							// 	 ip_cache == ivec3( 1, 6, 3 ) ) {
+							// 	printf( "%d,%d,%d,%d == %d,%d,%d: %f,%f,%f(%d)\n",
+							// 			blockIdx.x, blockIdx.y, threadIdx.x, threadIdx.y,
+							// 			ivec3( ip ).x, ivec3( ip ).y, ivec3( ip ).z,
+							// 			ray.o.x, ray.o.y, ray.o.z,
+							// 			pixel.nsteps );
+							// }
+							ivec3 ipm = mod( ip, vec3( MAXX ) );
+							absent_coord[ ipm.x ][ ipm.y ][ ipm.z ] = ip;
+							is_absent[ ipm.x ][ ipm.y ][ ipm.z ] = true;
 							break;
 						}
 					}
-					ray.o += ray.d * step;
 				}
-
-				pixel.nsteps = nsteps - i;
-				pixel.ray = ray;
-			} else {
-				pixel.nsteps = 0;
+				ray.o += ray.d * step;
+				nsteps -= 1;
 			}
-			pixel_out = pixel;
+			pixel_in_out = pixel;
 
 			__syncthreads();
 
@@ -152,31 +157,51 @@ VM_EXPORT
 
 	public:
 		Box3D bbox;
-		float th_4;
+		float step;
 		int max_steps = 500;
 
 		cufx::MemoryView1D<char> absent_buf;
 		int wg_max_emit_cnt;
 		int wg_len_bytes;
+
+		vec2 cache_du;
+		TextureAdapter thumbnail_tex;
+		TextureAdapter present_tex;
+		TextureAdapter cache_tex[ MAX_CACHE_SIZE ];
 	};
 
-	// struct VolumePixelShader : PixelShader
-	// {
-	// 	__device__ void
-	// 	  apply( Pixel &pixel_in_out ) const
-	// 	{
-	// 		// pixel_in_out.
-	// 		// for ( int i = 0; i < nsteps; ++i ) {
-	// 		// 	ray.o += ray.d * step;
-	// 		// 	glm::vec3 ip = floor( ray.o );
-	// 		// 	if ( float cd = this->chebyshev( ip ) ) {
-	// 		// 		i += skip_nblock_steps( ray, ip, cd, cdu, step );
-	// 		// 	} else if ( !this->integrate( ray.o, ip, pixel ) ) {
-	// 		// 		break;
-	// 		// 	}
-	// 		// }
-	// 	}
-	// };
+	struct VolumePixelShader : VolumeShader, PixelShader
+	{
+		__device__ void
+		  apply( Pixel &pixel_in_out ) const
+		{
+			auto pixel = pixel_in_out;
+			// if ( pixel.nsteps ) {
+			this->raymarch( pixel );
+			pixel_in_out = pixel;
+			// }
+		}
+	};
+
+	struct VolumeRayEmitShader : VolumeShader, RayEmitShader
+	{
+		__device__ void
+		  apply( Ray const &ray_in, Pixel &pixel_out ) const
+		{
+			auto ray = ray_in;
+			Pixel pixel = {};
+			float tnear, tfar;
+			if ( ray.intersect( bbox, tnear, tfar ) ) {
+				ray.o += ray.d * tnear;
+				pixel.nsteps = min( max_steps, int( ( tfar - tnear ) / this->step ) );
+				pixel.ray = ray;
+				this->raymarch( pixel );
+			} else {
+				pixel.nsteps = 0;
+			}
+			pixel_out = pixel;
+		}
+	};
 }
 
 VM_END_MODULE()

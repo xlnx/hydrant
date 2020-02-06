@@ -63,7 +63,7 @@ VM_EXPORT
 		}
 
 		template <typename F>
-		void iterate_3d( F const &f )
+		void iterate_3d( F const &f ) const
 		{
 			vol::Idx idx;
 			for ( idx.z = 0; idx.z != dim.z; ++idx.z ) {
@@ -124,6 +124,18 @@ VM_EXPORT
 					  }
 				  } );
 			} while ( update );
+		}
+
+		std::vector<vol::Idx> present_block_idxs() const
+		{
+			std::vector<vol::Idx> block_idxs;
+			iterate_3d(
+			  [&]( vol::Idx const &idx ) {
+				  if ( !( *this )[ idx ].chebyshev ) {
+					  block_idxs.emplace_back( idx );
+				  }
+			  } );
+			return block_idxs;
 		}
 
 		void dump( vol::Writer &writer ) const

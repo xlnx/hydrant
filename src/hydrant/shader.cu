@@ -2,7 +2,7 @@
 
 VM_BEGIN_MODULE( hydrant )
 
-__constant__ char shader_args_buffer[ 4096 ];
+__constant__ char shader_args_buffer[ 1024 * 16 ];
 
 /* Ray Emit Kernel Impl */
 
