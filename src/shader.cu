@@ -1,4 +1,4 @@
-#include "raycaster.hpp"
+#include <hydrant/shader.hpp>
 
 VM_BEGIN_MODULE( hydrant )
 

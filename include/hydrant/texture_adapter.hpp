@@ -1,7 +1,7 @@
 #pragma once
 
 #include <cudafx/texture.hpp>
-#include "glm_math.hpp"
+#include <hydrant/glm_math.hpp>
 
 VM_BEGIN_MODULE( hydrant )
 

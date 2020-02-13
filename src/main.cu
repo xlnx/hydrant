@@ -1,23 +1,45 @@
 #include <fstream>
 #include <atomic>
+#include <cstdlib>
+#include <cppfs/fs.h>
+#include <cppfs/FileHandle.h>
+#include <cppfs/FilePath.h>
 #include <VMUtils/timer.hpp>
 #include <VMUtils/cmdline.hpp>
+#include <VMUtils/fmt.hpp>
+#include <cudafx/device.hpp>
+#include <cudafx/transfer.hpp>
 #include <varch/utils/io.hpp>
 #include <varch/unarchive/unarchiver.hpp>
-#include <cudafx/transfer.hpp>
-#include <thumbnail.hpp>
-#include <buffer3d.hpp>
-#include "shaders/scratch.hpp"
+#include <varch/thumbnail.hpp>
+#include <varch/package_meta.hpp>
+#include <hydrant/buffer3d.hpp>
+#include <hydrant/raycaster.hpp>
 #include "shaders/volume_shader.hpp"
 
 using namespace std;
 using namespace vol;
 using namespace hydrant;
+using namespace cppfs;
+
+inline void ensure_dir( std::string const &path_v )
+{
+	auto path = cppfs::fs::open( path_v );
+	if ( !path.exists() ) {
+		vm::eprintln( "the specified path '{}' doesn't exist",
+					  path_v );
+		exit( 1 );
+	} else if ( path.isFile() ) {
+		vm::eprintln( "the specified path '{}' is not a file",
+					  path_v );
+		exit( 1 );
+	}
+}
 
 int main( int argc, char **argv )
 {
 	cmdline::parser a;
-	a.add<string>( "in", 'i', "input filename", true );
+	a.add<string>( "in", 'i', "input directory", true );
 	a.add<string>( "out", 'o', "output filename", true );
 	a.add( "thumb", 't', "take snapshots of single thumbnail file" );
 	a.add<string>( "config", 'c', "config file", false );
@@ -27,9 +49,14 @@ int main( int argc, char **argv )
 
 	a.parse_check( argc, argv );
 
-	auto in = a.get<string>( "in" );
-	auto out = a.get<string>( "out" );
+	auto in = FilePath( a.get<string>( "in" ) );
+	ensure_dir( in.resolved() );
+	auto out = FilePath( a.get<string>( "out" ) );
 	auto device = cufx::Device::scan()[ 0 ];
+
+	PackageMeta meta;
+	ifstream meta_is( in.resolve( "package_meta.json" ).resolved() );
+	meta_is >> meta;
 
 	using Shader = VolumeRayEmitShader;
 	Shader shader;
@@ -41,20 +68,21 @@ int main( int argc, char **argv )
 
 	/* input file */
 
-	ifstream is( in, ios::ate | ios::binary );
+	auto &lvl0_arch = meta.sample_levels[ 0 ].archives[ 0 ];
+	ifstream is( in.resolve( lvl0_arch.path ).resolved(), ios::ate | ios::binary );
 	auto len = is.tellg();
 	StreamReader reader( is, 0, len );
 	Unarchiver unarchiver( reader );
-	Thumbnail<ThumbUnit> thumbnail( in + ".thumb" );
+	Thumbnail chebyshev( in.resolve( lvl0_arch.thumbnails[ "chebyshev" ] ).resolved() );
 
 	glm::uvec3 dim = { unarchiver.dim().x, unarchiver.dim().y, unarchiver.dim().z };
-	glm::uvec3 bdim = { unarchiver.block_size(), unarchiver.block_size(), unarchiver.block_size() };
+	glm::uvec3 bdim = { unarchiver.padded_block_size(), unarchiver.padded_block_size(), unarchiver.padded_block_size() };
 
 	/* view */
 #pragma region
 
 	glm::vec3 raw = { unarchiver.raw().x, unarchiver.raw().y, unarchiver.raw().z };
-	glm::vec3 f_dim = raw / float( unarchiver.block_inner() );
+	glm::vec3 f_dim = raw / float( unarchiver.block_size() );
 	// glm::vec3 max = { dim.x, dim.y, dim.z };
 	auto exhibit = Exhibit{}
 					 .set_center( f_dim / 2.f )
@@ -62,8 +90,8 @@ int main( int argc, char **argv )
 
 	shader.bbox = Box3D{ { 0, 0, 0 }, f_dim };
 	shader.step = 1e-2f * f_dim.x / 4.f;
-	shader.cache_du.x = float( unarchiver.padding() ) / unarchiver.block_inner();
-	shader.cache_du.y = float( unarchiver.block_inner() ) / unarchiver.block_size();
+	shader.cache_du.x = float( unarchiver.padding() ) / unarchiver.block_size();
+	shader.cache_du.y = float( unarchiver.block_size() ) / unarchiver.padded_block_size();
 
 	auto camera = Camera{};
 	if ( a.exist( "config" ) ) {
@@ -78,23 +106,23 @@ int main( int argc, char **argv )
 
 #pragma endregion
 
-	/* thumbnail texture */
+	/* chebyshev texture */
 #pragma region
 
 	auto thumbnail_extent = cufx::Extent{}
 							  .set_width( dim.x )
 							  .set_height( dim.y )
 							  .set_depth( dim.z );
-	auto thumbnail_arr = device.alloc_arraynd<float2, 3>( thumbnail_extent );
-	// vm::println( "dim = {}, thumbnail_extent = {}", dim, thumbnail_extent );
 	auto thumbnail_view_info = cufx::MemoryView2DInfo{}
-								 .set_stride( dim.x * sizeof( float2 ) )
+								 .set_stride( dim.x * sizeof( float ) )
 								 .set_width( dim.x )
 								 .set_height( dim.y );
-	cufx::MemoryView3D<float2> thumbnail_view( thumbnail.data(), thumbnail_view_info, thumbnail_extent );
-	cufx::memory_transfer( thumbnail_arr, thumbnail_view ).launch();
-	cufx::Texture thumbnail_texture( thumbnail_arr, cufx::Texture::Options::as_array() );
-	shader.thumbnail_tex = thumbnail_texture;
+	auto chebyshev_arr = device.alloc_arraynd<float, 3>( thumbnail_extent );
+	// vm::println( "dim = {}, thumbnail_extent = {}", dim, thumbnail_extent );
+	cufx::MemoryView3D<float> chebyshev_view( chebyshev.data(), thumbnail_view_info, thumbnail_extent );
+	cufx::memory_transfer( chebyshev_arr, chebyshev_view ).launch();
+	cufx::Texture chebyshev_texture( chebyshev_arr, cufx::Texture::Options::as_array() );
+	shader.chebyshev_tex = chebyshev_texture;
 
 #pragma endregion
 
@@ -135,36 +163,41 @@ int main( int argc, char **argv )
 
 	/* block buffer */
 
-	auto block_size = unarchiver.block_size();
-	auto block_bytes = block_size * block_size * block_size;
+	auto pad_bs = unarchiver.padded_block_size();
+	auto block_bytes = pad_bs * pad_bs * pad_bs;
 	auto block_glob = device.alloc_global( block_bytes );
 	auto block_view_1d = block_glob.view_1d<unsigned char>( block_bytes );
 	auto block_view_info = cufx::MemoryView2DInfo{}
-							 .set_stride( block_size * sizeof( unsigned char ) )
-							 .set_width( block_size )
-							 .set_height( block_size );
+							 .set_stride( pad_bs * sizeof( unsigned char ) )
+							 .set_width( pad_bs )
+							 .set_height( pad_bs );
 	auto block_extent = cufx::Extent{}
-						  .set_width( block_size )
-						  .set_height( block_size )
-						  .set_depth( block_size );
+						  .set_width( pad_bs )
+						  .set_height( pad_bs )
+						  .set_depth( pad_bs );
 	auto block_view_3d = block_glob.view_3d<unsigned char>( block_view_info, block_extent );
 	vector<cufx::Array3D<unsigned char>> cache_block_arr;
 	for ( int i = 0; i != MAX_CACHE_SIZE; ++i ) {
 		cache_block_arr.emplace_back( device.alloc_arraynd<unsigned char, 3>( block_extent ) );
 	}
-	// cufx::MemoryView3D<int> thumbnail_view( thumbnail.data(), thumbnail_view_info, thumbnail_extent );
+	// cufx::MemoryView3D<int> chebyshev_view( chebyshev.data(), thumbnail_view_info, thumbnail_extent );
 	// cufx::memory_transfer( sampler_arr, block_view_3d, cudaPos{ 0, 0, 0 } ).launch();
 	// cufx::Texture sampler_texture( sampler_arr, cufx::Texture::Options::as_array() );
 
-	auto block_idxs = thumbnail.present_block_idxs();
+	std::vector<vol::Idx> block_idxs;
+	chebyshev.iterate_3d(
+	  [&]( vol::Idx const &idx ) {
+		  if ( !chebyshev[ idx ] ) {
+			  block_idxs.emplace_back( idx );
+		  }
+	  } );
+	vm::println("{}", block_idxs);
 	vector<glm::vec3> block_ccs( block_idxs.size() );
 	std::transform( block_idxs.begin(), block_idxs.end(), block_ccs.begin(),
 					[]( Idx const &idx ) { return glm::vec3( idx.x, idx.y, idx.z ) + 0.5f; } );
 	vector<int> pidx( block_idxs.size() );
 	for ( int i = 0; i != pidx.size(); ++i ) { pidx[ i ] = i; }
 	vm::println( "{}", block_idxs.size() );
-
-	vm::println( "{}", pidx );
 
 	auto et = exhibit.get_matrix();
 
@@ -181,15 +214,12 @@ int main( int argc, char **argv )
 		} );
 
 		glm::vec3 cp = et * glm::vec4( camera.position, 1 );
-		vm::println( "{}", cp );
 
 		std::sort( pidx.begin(), pidx.end(),
 				   [&]( int x, int y ) {
 					   return glm::distance( block_ccs[ x ], cp ) <
 							  glm::distance( block_ccs[ y ], cp );
 				   } );
-
-		vm::println( "{}", pidx );
 
 		for ( int i = 0; i < pidx.size(); i += MAX_CACHE_SIZE ) {
 			vector<Idx> idxs;
@@ -212,7 +242,6 @@ int main( int argc, char **argv )
 					  pkt.append_to( block_view_1d );
 					  nbytes += pkt.length;
 					  if ( nbytes >= block_bytes ) {
-						  // vm::println( "done {}", idx );
 						  cufx::memory_transfer( cache_block_arr[ blkid ], block_view_3d ).launch();
 						  //   if ( blkid == 0 ) {
 						  cache_texs.emplace_back( cache_block_arr[ blkid ],
@@ -254,5 +283,5 @@ int main( int argc, char **argv )
 
 	img_view.copy_from_device().launch();
 
-	image.dump( out );
+	image.dump( out.resolved() );
 }

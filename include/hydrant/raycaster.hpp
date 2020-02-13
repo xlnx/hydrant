@@ -6,9 +6,9 @@
 #include <cudafx/device.hpp>
 #include <cudafx/kernel.hpp>
 #include <cudafx/image.hpp>
-#include <glm_math.hpp>
-#include "scene.hpp"
-#include "shader.hpp"
+#include <hydrant/glm_math.hpp>
+#include <hydrant/scene.hpp>
+#include <hydrant/shader.hpp>
 
 VM_BEGIN_MODULE( hydrant )
 

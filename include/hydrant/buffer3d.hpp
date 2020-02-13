@@ -2,7 +2,7 @@
 
 #include <vector>
 #include <VMUtils/modules.hpp>
-#include <glm_math.hpp>
+#include <hydrant/glm_math.hpp>
 
 VM_BEGIN_MODULE( hydrant )
 

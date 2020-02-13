@@ -1,6 +1,8 @@
-#include <glm_math.hpp>
-#include <texture_adapter.hpp>
-#include "../shader.hpp"
+#pragma once
+
+#include <hydrant/glm_math.hpp>
+#include <hydrant/shader.hpp>
+#include <hydrant/texture_adapter.hpp>
 
 #define MAX_CACHE_SIZE ( 64 )
 
@@ -40,7 +42,7 @@ VM_EXPORT
 		__device__ float
 		  chebyshev( vec3 const &ip ) const
 		{
-			return thumbnail_tex.sample_3d<float2>( ip ).y;
+			return chebyshev_tex.sample_3d<float>( ip );
 		}
 
 		__device__ int
@@ -100,9 +102,9 @@ VM_EXPORT
 						// }
 						if ( present_id != -1 ) {
 							auto pt = ( cache_du.x + ( ray.o - ip ) ) * cache_du.y;
-							auto val = vec4( cache_tex[ present_id ].sample_3d<float>( pt ) );
-							// auto val = vec4( ray.o - ip, 1 );
-							// auto val = vec4( thumbnail_tex.sample_3d<float2>( ip ).x );
+							// auto val = vec4( cache_tex[ present_id ].sample_3d<float>( pt ) );
+							auto val = vec4( ray.o - ip, 1 );
+							// auto val = vec4( chebyshev_tex.sample_3d<float2>( ip ).x );
 							auto col = val * density;
 							pixel.v += col * ( 1.f - pixel.v.w );
 							if ( pixel.v.w > opacity_threshold ) {
@@ -165,7 +167,7 @@ VM_EXPORT
 		int wg_len_bytes;
 
 		vec2 cache_du;
-		TextureAdapter thumbnail_tex;
+		TextureAdapter chebyshev_tex;
 		TextureAdapter present_tex;
 		TextureAdapter cache_tex[ MAX_CACHE_SIZE ];
 	};

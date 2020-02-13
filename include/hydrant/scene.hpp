@@ -4,7 +4,7 @@
 #include <VMUtils/modules.hpp>
 #include <VMUtils/concepts.hpp>
 #include <VMUtils/attributes.hpp>
-#include <glm_math.hpp>
+#include <hydrant/glm_math.hpp>
 
 VM_BEGIN_MODULE( hydrant )
 
