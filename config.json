@@ -1,0 +1,22 @@
+{
+    "camera": {
+        "orbit": {
+            "arm": [
+                25,
+                65,
+                2.2
+            ]
+        }
+    },
+    "render": {
+        "resolution": [
+            512,
+            512
+        ],
+        "renderer": "volume",
+        "params": {
+            "mode": "volume",
+            "density": 1e-2
+        }
+    }
+}

@@ -1,17 +1,22 @@
 #pragma once
 
 #include <cudafx/texture.hpp>
-#include "glm_math.hpp"
+#include <hydrant/core/glm_math.hpp>
 
 VM_BEGIN_MODULE( hydrant )
 
 VM_EXPORT
 {
-	struct TextureAdapter
+	struct Sampler
 	{
-		TextureAdapter &operator=( cufx::Texture const &tex )
+		Sampler &operator=( cufx::Texture const &tex )
 		{
 			cu = tex.get();
+			return *this;
+		}
+		Sampler &operator=( cudaTextureObject_t const &tex )
+		{
+			cu = tex;
 			return *this;
 		}
 

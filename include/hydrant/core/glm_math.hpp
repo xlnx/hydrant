@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cuda_runtime.h>
 #include <glm/glm.hpp>
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtx/io.hpp>
@@ -12,15 +13,21 @@
 
 namespace glm
 {
-inline void to_json( nlohmann::json &j, const vec3 &v )
+template <length_t N, typename T, qualifier Q>
+void to_json( nlohmann::json &j, const vec<N, T, Q> &v )
 {
-	j = { v.x, v.y, v.z };
+	j = nlohmann::json::array();
+	for ( auto i = 0; i < N; ++i ) {
+		j[ i ] = v[ i ];
+	}
 }
-inline void from_json( const nlohmann::json &j, vec3 &v )
+
+template <length_t N, typename T, qualifier Q>
+inline void from_json( const nlohmann::json &j, vec<N, T, Q> &v )
 {
-	v.x = j[ 0 ].get<float>();
-	v.y = j[ 1 ].get<float>();
-	v.z = j[ 2 ].get<float>();
+	for ( auto i = 0; i < N; ++i ) {
+		v[ i ] = j[ i ].get<T>();
+	}
 }
 }  // namespace glm
 
