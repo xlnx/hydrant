@@ -42,17 +42,18 @@ inline void ensure_file( std::string const &path_v )
 	}
 }
 
+struct Config : vm::json::Serializable<Config>
+{
+	VM_JSON_FIELD( CameraConfig, camera );
+	VM_JSON_FIELD( RendererConfig, render );
+};
+
 int main( int argc, char **argv )
 {
 	cmdline::parser a;
 	a.add<string>( "in", 'i', "input directory", true );
 	a.add<string>( "out", 'o', "output filename", true );
-	a.add( "thumb", 't', "take snapshots of single thumbnail file" );
-	a.add<string>( "renderer", 'r', "renderer config file", false );
-	a.add<string>( "camera", 'c', "camera config file", false );
-	a.add<float>( "x", 'x', "camera.x", false, 3 );
-	a.add<float>( "y", 'y', "camera.y", false, 2 );
-	a.add<float>( "z", 'z', "camera.z", false, 2 );
+	a.add<string>( "config", 'c', "config file path", true );
 
 	a.parse_check( argc, argv );
 
@@ -61,27 +62,14 @@ int main( int argc, char **argv )
 	auto out = FilePath( a.get<string>( "out" ) );
 	auto device = cufx::Device::scan()[ 0 ];
 
-	auto camera = Camera{};
-	if ( a.exist( "camera" ) ) {
-		auto cfg_path = FilePath( a.get<string>( "camera" ) );
-		ensure_file( cfg_path.resolved() );
-		camera = Camera::from_config( cfg_path.resolved() );
-	} else {
-		auto x = a.get<float>( "x" );
-		auto y = a.get<float>( "y" );
-		auto z = a.get<float>( "z" );
-		camera.set_position( x, y, z );
-	}
+	auto cfg_path = FilePath( a.get<string>( "config" ) );
+	ensure_file( cfg_path.resolved() );
+	ifstream is( cfg_path.resolved() );
+	Config cfg;
+	is >> cfg;
 
 	RendererFactory factory( in );
-	RendererConfig cfg;
-	if ( a.exist( "renderer" ) ) {
-		auto cfg_path = FilePath( a.get<string>( "renderer" ) );
-		ensure_file( cfg_path.resolved() );
-		ifstream is( cfg_path.resolved() );
-		is >> cfg;
-	}
-
-	auto renderer = factory.create( cfg );
+	auto renderer = factory.create( cfg.render );
+	auto camera = Camera::from_config( cfg.camera );
 	renderer->offline_render( out.resolved(), camera );
 }

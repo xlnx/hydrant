@@ -10,7 +10,7 @@ VM_EXPORT
 	{
 		vm::Box<Renderer> vis(
 		  [&]() -> Renderer * {
-			  if ( cfg.renderer == "volume" ) return nullptr;  //new VolumeRenderer;
+			  if ( cfg.renderer == "volume" ) return new VolumeRenderer;
 			  if ( cfg.renderer == "blocks" ) return new BlocksRenderer;
 			  throw std::logic_error( vm::fmt( "unknown renderer '{}'", cfg.renderer ) );
 		  }() );

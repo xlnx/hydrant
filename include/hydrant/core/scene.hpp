@@ -21,12 +21,6 @@ struct Orbit : vm::json::Serializable<Orbit>
 	VM_JSON_FIELD( vec3, arm );
 };
 
-struct CameraConfig : vm::json::Serializable<CameraConfig>
-{
-	VM_JSON_FIELD( std::shared_ptr<PTU>, ptu ) = nullptr;
-	VM_JSON_FIELD( std::shared_ptr<Orbit>, orbit ) = nullptr;
-};
-
 VM_EXPORT
 {
 	struct Exhibit : vm::Dynamic
@@ -46,6 +40,12 @@ VM_EXPORT
 		}
 	};
 
+	struct CameraConfig : vm::json::Serializable<CameraConfig>
+	{
+		VM_JSON_FIELD( std::shared_ptr<PTU>, ptu ) = nullptr;
+		VM_JSON_FIELD( std::shared_ptr<Orbit>, orbit ) = nullptr;
+	};
+
 	struct Camera
 	{
 		VM_DEFINE_ATTRIBUTE( vec3, position ) = { 2, 0.5, 0 };
@@ -55,12 +55,8 @@ VM_EXPORT
 		mat4 get_matrix() const { return lookAt( position, target, up ); }
 
 	public:
-		static Camera from_config( std::string const &filename )
+		static Camera from_config( CameraConfig const &cfg )
 		{
-			CameraConfig cfg;
-			std::ifstream is( filename );
-			is >> cfg;
-
 			Camera camera;
 			if ( cfg.ptu ) {
 				camera.position = cfg.ptu->position;
