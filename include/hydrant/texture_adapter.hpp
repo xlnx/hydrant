@@ -1,7 +1,7 @@
 #pragma once
 
 #include <cudafx/texture.hpp>
-#include "glm_math.hpp"
+#include <hydrant/glm_math.hpp>
 
 VM_BEGIN_MODULE( hydrant )
 
@@ -12,6 +12,11 @@ VM_EXPORT
 		TextureAdapter &operator=( cufx::Texture const &tex )
 		{
 			cu = tex.get();
+			return *this;
+		}
+		TextureAdapter &operator=( cudaTextureObject_t const &tex )
+		{
+			cu = tex;
 			return *this;
 		}
 
