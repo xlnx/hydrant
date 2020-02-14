@@ -1,6 +1,6 @@
 #pragma once
 
-#include <hydrant/glm_math.hpp>
+#include <hydrant/core/glm_math.hpp>
 
 VM_BEGIN_MODULE( hydrant )
 
