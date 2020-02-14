@@ -121,7 +121,9 @@ int main( int argc, char **argv )
 	// vm::println( "dim = {}, thumbnail_extent = {}", dim, thumbnail_extent );
 	cufx::MemoryView3D<float> chebyshev_view( chebyshev.data(), thumbnail_view_info, thumbnail_extent );
 	cufx::memory_transfer( chebyshev_arr, chebyshev_view ).launch();
-	cufx::Texture chebyshev_texture( chebyshev_arr, cufx::Texture::Options::as_array() );
+	cufx::Texture chebyshev_texture( chebyshev_arr,
+									 cufx::Texture::Options::as_array()
+									   .set_address_mode( cufx::Texture::AddressMode::Clamp ) );
 	shader.chebyshev_tex = chebyshev_texture;
 
 #pragma endregion
@@ -191,7 +193,7 @@ int main( int argc, char **argv )
 			  block_idxs.emplace_back( idx );
 		  }
 	  } );
-	vm::println("{}", block_idxs);
+	vm::println( "{}", block_idxs );
 	vector<glm::vec3> block_ccs( block_idxs.size() );
 	std::transform( block_idxs.begin(), block_idxs.end(), block_ccs.begin(),
 					[]( Idx const &idx ) { return glm::vec3( idx.x, idx.y, idx.z ) + 0.5f; } );

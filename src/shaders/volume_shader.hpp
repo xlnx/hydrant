@@ -39,12 +39,6 @@ VM_EXPORT
 	{
 		using Pixel = StandardVolumePixel;
 
-		__device__ float
-		  chebyshev( vec3 const &ip ) const
-		{
-			return chebyshev_tex.sample_3d<float>( ip );
-		}
-
 		__device__ int
 		  skip_nblock_steps( Ray &ray, vec3 const &ip,
 							 float nblocks, float cdu, float step ) const
@@ -84,47 +78,25 @@ VM_EXPORT
 
 			while ( nsteps > 0 ) {
 				vec3 ip = floor( ray.o );
-				if ( all( greaterThanEqual( ip, bbox.min ) ) &&
-					 all( lessThan( ip, bbox.max ) ) ) {
-					if ( float cd = this->chebyshev( ip ) ) {
-						nsteps -= skip_nblock_steps( ray, ip, cd, cdu, step );
-					} else {
-						// ivec3 ip_cache = mod( ip, vec3( 8 ) );
-						// auto &cache_unit = cache[ ip_cache.x ][ ip_cache.y ][ ip_cache.z ];
-						// if ( cache_unit.ip == ivec3( ip ) ) {
-						auto present_id = present_tex.sample_3d<int>( ip );
-						// if ( threadIdx.x == 0 && threadIdx.y == 0 ) {
-						// 	printf( "%d,%d,%d,%d == %d,%d,%d: %f,%f,%f(%d) %d\n",
-						// 			blockIdx.x, blockIdx.y, threadIdx.x, threadIdx.y,
-						// 			ivec3( ip ).x, ivec3( ip ).y, ivec3( ip ).z,
-						// 			ray.o.x, ray.o.y, ray.o.z,
-						// 			pixel.nsteps, present_id );
-						// }
-						if ( present_id != -1 ) {
-							auto pt = ( cache_du.x + ( ray.o - ip ) ) * cache_du.y;
-							// auto val = vec4( cache_tex[ present_id ].sample_3d<float>( pt ) );
-							auto val = vec4( ray.o - ip, 1 );
-							// auto val = vec4( chebyshev_tex.sample_3d<float2>( ip ).x );
-							auto col = val * density;
-							pixel.v += col * ( 1.f - pixel.v.w );
-							if ( pixel.v.w > opacity_threshold ) {
-								break;
-							}
-						} else {
-							// if ( cache_unit.ip != ivec3( -1 ) && ip_cache == ivec3( 1, 6, 3 ) ) {
-							// if ( uvec4( blockIdx.x, blockIdx.y, threadIdx.x, threadIdx.y ) == uvec4( 11, 9, 19, 28 ) ||
-							// 	 ip_cache == ivec3( 1, 6, 3 ) ) {
-							// 	printf( "%d,%d,%d,%d == %d,%d,%d: %f,%f,%f(%d)\n",
-							// 			blockIdx.x, blockIdx.y, threadIdx.x, threadIdx.y,
-							// 			ivec3( ip ).x, ivec3( ip ).y, ivec3( ip ).z,
-							// 			ray.o.x, ray.o.y, ray.o.z,
-							// 			pixel.nsteps );
-							// }
-							ivec3 ipm = mod( ip, vec3( MAXX ) );
-							absent_coord[ ipm.x ][ ipm.y ][ ipm.z ] = ip;
-							is_absent[ ipm.x ][ ipm.y ][ ipm.z ] = true;
+				if ( float cd = chebyshev_tex.sample_3d<float>( ip ) ) {
+					nsteps -= skip_nblock_steps( ray, ip, cd, cdu, step );
+				} else {
+					auto present_id = present_tex.sample_3d<int>( ip );
+					if ( present_id != -1 ) {
+						auto pt = ( cache_du.x + ( ray.o - ip ) ) * cache_du.y;
+						auto val = vec4( cache_tex[ present_id ].sample_3d<float>( pt ) );
+						// auto val = vec4( ray.o - ip, 1 );
+						// auto val = vec4( chebyshev_tex.sample_3d<float2>( ip ).x );
+						auto col = val * density;
+						pixel.v += col * ( 1.f - pixel.v.w );
+						if ( pixel.v.w > opacity_threshold ) {
 							break;
 						}
+					} else {
+						ivec3 ipm = mod( ip, vec3( MAXX ) );
+						absent_coord[ ipm.x ][ ipm.y ][ ipm.z ] = ip;
+						is_absent[ ipm.x ][ ipm.y ][ ipm.z ] = true;
+						break;
 					}
 				}
 				ray.o += ray.d * step;
