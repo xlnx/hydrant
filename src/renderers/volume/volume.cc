@@ -17,8 +17,17 @@ VM_EXPORT
 		auto my_cfg = cfg.params.get<VolumeRendererConfig>();
 		// shader.render_mode = my_cfg.mode == "volume" ? BrmVolume : BrmSolid;
 		// shader.density = my_cfg.density;
+		if ( my_cfg.device == ShadingDevice::Cuda ) {
+			device = cufx::Device::get_default();
+		}
+		if ( !device.has_value() ) {
+			throw std::logic_error( "cuda device not found, render failed" );
+		}
 
-		image = CudaImage<typename Shader::Pixel>( cfg.resolution, device );
+		auto img_opts = ImageOptions{}
+						  .set_device( device )
+						  .set_resolution( cfg.resolution );
+		image = Image<typename Shader::Pixel>( img_opts );
 
 		auto &lvl0_arch = dataset->meta.sample_levels[ 0 ].archives[ 0 ];
 		uu.reset( new Unarchiver( dataset->root.resolve( lvl0_arch.path ).resolved() ) );
@@ -39,31 +48,35 @@ VM_EXPORT
 		shader.cache_du.x = float( uu->padding() ) / uu->block_size();
 		shader.cache_du.y = float( uu->block_size() ) / uu->padded_block_size();
 
-		Thumbnail chebyshev_thumb( dataset->root.resolve( lvl0_arch.thumbnails[ "chebyshev" ] ).resolved() );
-		chebyshev = ConstTexture3D<float>(
-		  dim, chebyshev_thumb.data(),
-		  cufx::Texture::Options::as_array()
-			.set_address_mode( cufx::Texture::AddressMode::Clamp ),
-		  device );
-		shader.chebyshev_tex = chebyshev.value().get();
+		Thumbnail<int> chebyshev_thumb( dataset->root.resolve( lvl0_arch.thumbnails[ "chebyshev" ] ).resolved() );
+		chebyshev = ConstTexture3D<int>(
+		  ConstTexture3DOptions{}
+			.set_device( device )
+			.set_dim( dim )
+			.set_data( chebyshev_thumb.data() )
+			.set_opts( cufx::Texture::Options::as_array()
+						 .set_address_mode( cufx::Texture::AddressMode::Clamp ) ) );
+		shader.chebyshev_tex = chebyshev.get();
 
 		present_buf = Buffer3D<int>( dim );
 		present = ConstTexture3D<int>(
-		  dim, present_buf.value().data(),
-		  cufx::Texture::Options::as_array()
-			.set_address_mode( cufx::Texture::AddressMode::Clamp ),
-		  device );
+		  ConstTexture3DOptions{}
+			.set_device( device )
+			.set_dim( dim )
+			.set_data( present_buf.value().data() )
+			.set_opts( cufx::Texture::Options::as_array()
+						 .set_address_mode( cufx::Texture::AddressMode::Clamp ) ) );
 
 		/* absent buffer */
 #pragma region
 
-		auto wg_cnt = 32 * 32;
-		shader.wg_max_emit_cnt = 8;
-		shader.wg_len_bytes = sizeof( int ) +
-							  shader.wg_max_emit_cnt * sizeof( glm::uvec3 );
-		auto absent_glob = device.alloc_global( shader.wg_len_bytes * wg_cnt );
-		vector<char> absent( absent_glob.size() );
-		shader.absent_buf = absent_glob.view_1d<char>( absent_glob.size() );
+		// auto wg_cnt = 32 * 32;
+		// shader.wg_max_emit_cnt = 8;
+		// shader.wg_len_bytes = sizeof( int ) +
+		// 					  shader.wg_max_emit_cnt * sizeof( glm::uvec3 );
+		// auto absent_glob = device.alloc_global( shader.wg_len_bytes * wg_cnt );
+		// vector<char> absent( absent_glob.size() );
+		// shader.absent_buf = absent_glob.view_1d<char>( absent_glob.size() );
 
 #pragma endregion
 
@@ -91,7 +104,7 @@ VM_EXPORT
 
 		auto pad_bs = uu->padded_block_size();
 		auto block_bytes = pad_bs * pad_bs * pad_bs;
-		auto block_glob = device.alloc_global( block_bytes );
+		auto block_glob = device.value().alloc_global( block_bytes );
 		auto block_view_1d = block_glob.view_1d<unsigned char>( block_bytes );
 		auto block_view_info = cufx::MemoryView2DInfo{}
 								 .set_stride( pad_bs * sizeof( unsigned char ) )
@@ -104,7 +117,7 @@ VM_EXPORT
 		auto block_view_3d = block_glob.view_3d<unsigned char>( block_view_info, block_extent );
 		vector<cufx::Array3D<unsigned char>> cache_block_arr;
 		for ( int i = 0; i != MAX_CACHE_SIZE; ++i ) {
-			cache_block_arr.emplace_back( device.alloc_arraynd<unsigned char, 3>( block_extent ) );
+			cache_block_arr.emplace_back( device.value().alloc_arraynd<unsigned char, 3>( block_extent ) );
 		}
 		// cufx::MemoryView3D<int> chebyshev_view( chebyshev.data(), thumbnail_view_info, thumbnail_extent );
 		// cufx::memory_transfer( sampler_arr, block_view_3d, cudaPos{ 0, 0, 0 } ).launch();
@@ -165,7 +178,7 @@ VM_EXPORT
 					  } );
 				}
 
-				shader.present_tex = present.value().update();
+				shader.present_tex = present.update();
 
 				// vm::println( "{}", cache_texs.size() );
 				for ( int j = 0; j != cache_texs.size(); ++j ) {
@@ -178,17 +191,17 @@ VM_EXPORT
 					} );
 
 					if ( i == 0 ) {
-						raycaster.cast( exhibit, camera, image.value().view(), shader );
+						raycaster.cast_cuda( exhibit, camera, image.view(), shader );
 					} else {
-						raycaster.cast( image.value().view(), shader );
+						raycaster.cast_cuda( image.view(), shader );
 					}
 				}
 			}
 
-			image.value().view().copy_from_device().launch();
+			image.view().copy_from_device().launch();
 		}
 
-		image.value().get().dump( dst_path );
+		image.get().dump( dst_path );
 	}
 
 	REGISTER_RENDERER( VolumeRenderer, "Volume" );

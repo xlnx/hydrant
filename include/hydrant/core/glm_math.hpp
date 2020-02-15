@@ -1,11 +1,11 @@
 #pragma once
 
 #include <cuda_runtime.h>
-#include <glm/glm.hpp>
+#include <glmcuda/glm.hpp>
 #define GLM_ENABLE_EXPERIMENTAL
-#include <glm/gtx/io.hpp>
-#include <glm/gtx/component_wise.hpp>
-#include <glm/gtc/matrix_transform.hpp>
+#include <glmcuda/gtx/io.hpp>
+#include <glmcuda/gtx/component_wise.hpp>
+#include <glmcuda/gtc/matrix_transform.hpp>
 #include <VMUtils/fmt.hpp>
 #include <VMUtils/attributes.hpp>
 #include <VMUtils/modules.hpp>

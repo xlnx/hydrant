@@ -1,6 +1,6 @@
 #include <varch/utils/io.hpp>
 #include <varch/unarchive/unarchiver.hpp>
-#include <varch/thumbnail.hpp>
+#include <hydrant/basic_renderer.hpp>
 #include "blocks.hpp"
 
 using namespace std;
@@ -19,7 +19,10 @@ VM_EXPORT
 		shader.render_mode = my_cfg.mode;
 		shader.density = my_cfg.density;
 
-		image = CudaImage<typename Shader::Pixel>( cfg.resolution, device );
+		auto img_opts = ImageOptions{}
+						  .set_device( device )
+						  .set_resolution( cfg.resolution );
+		image = Image<typename Shader::Pixel>( img_opts );
 
 		auto &lvl0_arch = dataset->meta.sample_levels[ 0 ].archives[ 0 ];
 		ifstream is( dataset->root.resolve( lvl0_arch.path ).resolved(), ios::ate | ios::binary );
@@ -40,21 +43,13 @@ VM_EXPORT
 		shader.bbox = Box3D{ { 0, 0, 0 }, f_dim };
 		shader.step = 1e-2f * f_dim.x / 4.f;
 
-		Thumbnail chebyshev_thumb( dataset->root.resolve( lvl0_arch.thumbnails[ "chebyshev" ] ).resolved() );
-		chebyshev = ConstTexture3D<float>(
-		  dim, chebyshev_thumb.data(),
-		  cufx::Texture::Options::as_array()
-			.set_address_mode( cufx::Texture::AddressMode::Clamp ),
-		  device );
-		shader.chebyshev_tex = chebyshev.value().get();
+		chebyshev = load_thumbnail<int>(
+		  dataset->root.resolve( lvl0_arch.thumbnails[ "chebyshev" ] ).resolved() );
+		shader.chebyshev_tex = chebyshev.get();
 
-		Thumbnail mean_thumb( dataset->root.resolve( lvl0_arch.thumbnails[ "mean" ] ).resolved() );
-		mean = ConstTexture3D<float>(
-		  dim, mean_thumb.data(),
-		  cufx::Texture::Options::as_array()
-			.set_address_mode( cufx::Texture::AddressMode::Clamp ),
-		  device );
-		shader.mean_tex = mean.value().get();
+		mean = load_thumbnail<float>(
+		  dataset->root.resolve( lvl0_arch.thumbnails[ "mean" ] ).resolved() );
+		shader.mean_tex = mean.get();
 
 		return true;
 	}
@@ -62,9 +57,8 @@ VM_EXPORT
 	void BlocksRenderer::offline_render( std::string const &dst_path,
 										 Camera const &camera )
 	{
-		raycaster.cast( exhibit, camera, image.value().view(), shader );
-		image.value().view().copy_from_device().launch();
-		image.value().get().dump( dst_path );
+		raycaster.cast_cpu( exhibit, camera, image.view(), shader );
+		image.fetch_data().dump( dst_path );
 	}
 
 	REGISTER_RENDERER( BlocksRenderer, "Blocks" );

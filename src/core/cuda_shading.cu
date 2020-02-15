@@ -28,7 +28,7 @@ __global__ void
 		normalize( vec3( args.view.trans * vec4( uv.x, -uv.y, -args.view.itg_fovy, 1 ) ) - args.view.ray_o )
 	};
 
-	auto shader = (p_ray_emit_shader_t)args.function_desc.fp;
+	auto shader = (ray_emit_shader_t *)args.function_desc.fp;
 	shader( ray,
 			args.image_desc.data + args.image_desc.pixel_size * ( args.image_desc.resolution.x * y + x ),
 			shader_args_buffer + args.function_desc.offset );
@@ -48,7 +48,7 @@ __global__ void
 		return;
 	}
 
-	auto shader = (p_pixel_shader_t)args.function_desc.fp;
+	auto shader = (pixel_shader_t *)args.function_desc.fp;
 	shader( args.image_desc.data + args.image_desc.pixel_size * ( args.image_desc.resolution.x * y + x ),
 			shader_args_buffer + args.function_desc.offset );
 }

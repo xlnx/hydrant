@@ -4,7 +4,7 @@
 #include <hydrant/unarchiver.hpp>
 #include <hydrant/renderer.hpp>
 #include <hydrant/const_texture_3d.hpp>
-#include <hydrant/cuda_image.hpp>
+#include <hydrant/image.hpp>
 #include <hydrant/buffer3d.hpp>
 #include "volume_shader.hpp"
 
@@ -14,6 +14,7 @@ VM_EXPORT
 {
 	struct VolumeRendererConfig : vm::json::Serializable<VolumeRendererConfig>
 	{
+		VM_JSON_FIELD( ShadingDevice, device ) = ShadingDevice::Cuda;
 	};
 
 	struct VolumeRenderer : IRenderer
@@ -28,16 +29,15 @@ VM_EXPORT
 									 Camera const &camera ) override;
 
 	private:
-		cufx::Device device = cufx::Device::scan()[ 0 ];
+		vm::Option<cufx::Device> device;
 		Shader shader;
 		Exhibit exhibit;
 
 		std::shared_ptr<Unarchiver> uu;
 
-		vm::Option<CudaImage<typename Shader::Pixel>> image;
-		vm::Option<ConstTexture3D<float>> chebyshev;
-		vm::Option<ConstTexture3D<float>> mean;
-		vm::Option<ConstTexture3D<int>> present;
+		Image<typename Shader::Pixel> image;
+		ConstTexture3D<int> chebyshev;
+		ConstTexture3D<int> present;
 
 		vm::Option<Buffer3D<int>> present_buf;
 

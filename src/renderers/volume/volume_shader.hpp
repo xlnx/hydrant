@@ -2,7 +2,7 @@
 
 #include <hydrant/core/glm_math.hpp>
 #include <hydrant/core/shader.hpp>
-#include <hydrant/core/sampler.hpp>
+#include <hydrant/sampler.hpp>
 #include <hydrant/pixel_template.hpp>
 
 #define MAX_CACHE_SIZE ( 64 )

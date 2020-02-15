@@ -71,5 +71,6 @@ int main( int argc, char **argv )
 	RendererFactory factory( in );
 	auto renderer = factory.create( cfg.render );
 	auto camera = Camera::from_config( cfg.camera );
+
 	renderer->offline_render( out.resolved(), camera );
 }

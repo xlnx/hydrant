@@ -13,7 +13,7 @@
             512,
             512
         ],
-        "renderer": "Volume",
+        "renderer": "Blocks",
         "params": {
             "mode": "Volume",
             "density": 1e-2
