@@ -13,9 +13,9 @@
             512,
             512
         ],
-        "renderer": "volume",
+        "renderer": "Volume",
         "params": {
-            "mode": "volume",
+            "mode": "Volume",
             "density": 1e-2
         }
     }

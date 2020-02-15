@@ -10,9 +10,12 @@ VM_EXPORT
 	{
 		vm::Box<Renderer> vis(
 		  [&]() -> Renderer * {
-			  if ( cfg.renderer == "volume" ) return new VolumeRenderer;
-			  if ( cfg.renderer == "blocks" ) return new BlocksRenderer;
-			  throw std::logic_error( vm::fmt( "unknown renderer '{}'", cfg.renderer ) );
+			  switch ( cfg.renderer._to_integral() ) {
+			  case RendererName::Volume: return new VolumeRenderer;
+			  case RendererName::Blocks: return new BlocksRenderer;
+			  default:
+				  throw std::logic_error( vm::fmt( "unknown renderer '{}'", cfg.renderer ) );
+			  }
 		  }() );
 		vis->init( dataset, cfg );
 		return vis;

@@ -11,7 +11,7 @@ VM_EXPORT
 {
 	struct BlocksRendererConfig : vm::json::Serializable<BlocksRendererConfig>
 	{
-		VM_JSON_FIELD( std::string, mode ) = "volume";
+		VM_JSON_FIELD( BlocksRenderMode, mode ) = BlocksRenderMode::Volume;
 		VM_JSON_FIELD( float, density ) = 1e-2f;
 	};
 

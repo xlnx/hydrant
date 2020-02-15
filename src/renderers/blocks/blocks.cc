@@ -16,7 +16,7 @@ VM_EXPORT
 		if ( !Super::init( dataset, cfg ) ) { return false; }
 
 		auto my_cfg = cfg.params.get<BlocksRendererConfig>();
-		shader.render_mode = my_cfg.mode == "volume" ? BrmVolume : BrmSolid;
+		shader.render_mode = my_cfg.mode;
 		shader.density = my_cfg.density;
 
 		image = CudaImage<typename Shader::Pixel>( cfg.resolution, device );

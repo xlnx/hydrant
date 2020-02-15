@@ -5,6 +5,7 @@
 #include <functional>
 #include <typeindex>
 #include <typeinfo>
+#include <VMUtils/enum.hpp>
 #include <hydrant/core/glm_math.hpp>
 #include <cudafx/kernel.hpp>
 #include <cudafx/image.hpp>
@@ -20,17 +21,11 @@ struct IShaderTypeErased
 
 VM_EXPORT
 {
-	enum ShadingDevice
-	{
-		Cpu,
-		Cuda
-	};
+	VM_ENUM( ShadingDevice,
+			 Cpu, Cuda );
 
-	enum ShadingResult
-	{
-		Ok = 0,
-		Err
-	};
+	VM_ENUM( ShadingResult,
+			 Ok, Err );
 
 	struct IPixel
 	{
@@ -108,7 +103,7 @@ struct CudaShadingArgs
 
 struct ShaderMeta
 {
-	std::map<ShadingDevice,
+	std::map<ShadingDevice::_enumerated,
 			 std::function<ShadingResult( void * )>>
 	  devices;
 	std::string name;

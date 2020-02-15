@@ -31,7 +31,7 @@ struct VisBlocksShaderKernel : BlocksShader
 				nsteps -= skip_nblock_steps( ray, ip, cd, cdu, step );
 			} else {
 				auto rip = clamp( ip, bbox.min, bbox.max - 1.f ) / ( bbox.max - bbox.min );
-				if ( render_mode == BlocksRenderMode::BrmVolume ) {
+				if ( render_mode == BlocksRenderMode::Volume ) {
 					auto mean = mean_tex.sample_3d<float>( ip );
 					auto col = vec4( rip, 1.f ) * density * mean;
 					pixel.v += col * ( 1.f - pixel.v.w );
@@ -39,7 +39,7 @@ struct VisBlocksShaderKernel : BlocksShader
 						nsteps = 0;
 						break;
 					}
-				} else if ( render_mode == BlocksRenderMode::BrmSolid ) {
+				} else if ( render_mode == BlocksRenderMode::Solid ) {
 					pixel.v = vec4( rip, 1.f );
 					nsteps = 0;
 					break;

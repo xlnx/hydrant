@@ -2,6 +2,7 @@
 
 #include <string>
 #include <fstream>
+#include <VMUtils/enum.hpp>
 #include <hydrant/core/glm_math.hpp>
 #include <hydrant/core/raycaster.hpp>
 #include "dataset.hpp"
@@ -10,10 +11,13 @@ VM_BEGIN_MODULE( hydrant )
 
 VM_EXPORT
 {
+	VM_ENUM( RendererName,
+			 Volume, Blocks );
+
 	struct RendererConfig : vm::json::Serializable<RendererConfig>
 	{
 		VM_JSON_FIELD( glm::ivec2, resolution ) = { 512, 512 };
-		VM_JSON_FIELD( std::string, renderer ) = "volume";
+		VM_JSON_FIELD( RendererName, renderer ) = RendererName::Volume;
 		VM_JSON_FIELD( vm::json::Any, params ) = vm::json::Any();
 	};
 
