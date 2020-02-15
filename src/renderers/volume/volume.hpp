@@ -5,7 +5,7 @@
 #include <hydrant/renderer.hpp>
 #include <hydrant/const_texture_3d.hpp>
 #include <hydrant/cuda_image.hpp>
-#include <hydrant/core/buffer3d.hpp>
+#include <hydrant/buffer3d.hpp>
 #include "volume_shader.hpp"
 
 VM_BEGIN_MODULE( hydrant )
@@ -16,10 +16,10 @@ VM_EXPORT
 	{
 	};
 
-	struct VolumeRenderer : Renderer
+	struct VolumeRenderer : IRenderer
 	{
 		using Shader = VolumeShader;
-		using Super = Renderer;
+		using Super = IRenderer;
 
 		virtual bool init( std::shared_ptr<Dataset> const &dataset,
 						   RendererConfig const &cfg ) override;

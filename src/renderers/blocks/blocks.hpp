@@ -15,10 +15,10 @@ VM_EXPORT
 		VM_JSON_FIELD( float, density ) = 1e-2f;
 	};
 
-	struct BlocksRenderer : Renderer
+	struct BlocksRenderer : IRenderer
 	{
 		using Shader = BlocksShader;
-		using Super = Renderer;
+		using Super = IRenderer;
 
 		virtual bool init( std::shared_ptr<Dataset> const &dataset,
 						   RendererConfig const &cfg ) override;

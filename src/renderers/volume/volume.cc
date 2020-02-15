@@ -190,6 +190,8 @@ VM_EXPORT
 
 		image.value().get().dump( dst_path );
 	}
+
+	REGISTER_RENDERER( VolumeRenderer, "Volume" );
 }
 
 VM_END_MODULE()

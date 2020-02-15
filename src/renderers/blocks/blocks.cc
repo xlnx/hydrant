@@ -66,6 +66,8 @@ VM_EXPORT
 		image.value().view().copy_from_device().launch();
 		image.value().get().dump( dst_path );
 	}
+
+	REGISTER_RENDERER( BlocksRenderer, "Blocks" );
 }
 
 VM_END_MODULE()

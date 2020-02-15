@@ -11,17 +11,14 @@ VM_BEGIN_MODULE( hydrant )
 
 VM_EXPORT
 {
-	VM_ENUM( RendererName,
-			 Volume, Blocks );
-
 	struct RendererConfig : vm::json::Serializable<RendererConfig>
 	{
 		VM_JSON_FIELD( glm::ivec2, resolution ) = { 512, 512 };
-		VM_JSON_FIELD( RendererName, renderer ) = RendererName::Volume;
+		VM_JSON_FIELD( std::string, renderer );
 		VM_JSON_FIELD( vm::json::Any, params ) = vm::json::Any();
 	};
 
-	struct Renderer : vm::Dynamic
+	struct IRenderer : vm::Dynamic
 	{
 		virtual bool init( std::shared_ptr<Dataset> const &dataset, RendererConfig const &cfg )
 		{
@@ -48,11 +45,33 @@ VM_EXPORT
 			dataset->root = dataset_path;
 		}
 
-		vm::Box<Renderer> create( RendererConfig const &cfg );
+		vm::Box<IRenderer> create( RendererConfig const &cfg );
+
+		static std::vector<std::string> list_candidates();
 
 	private:
 		std::shared_ptr<Dataset> dataset;
 	};
 }
+
+struct RendererRegistry
+{
+	static RendererRegistry instance;
+
+	std::map<std::string, std::function<IRenderer *()>> types;
+};
+
+#define REGISTER_RENDERER( T, name ) \
+	REGISTER_RENDERER_UNIQ_HELPER( __COUNTER__, T, name )
+
+#define REGISTER_RENDERER_UNIQ_HELPER( ctr, T, name ) \
+	REGISTER_RENDERER_UNIQ( ctr, T, name )
+
+#define REGISTER_RENDERER_UNIQ( ctr, T, name )                            \
+	static int                                                            \
+	  renderer_registrar__body__##ctr##__object =                         \
+		(::hydrant::__inner__::RendererRegistry::instance.types[ name ] = \
+		   []() -> ::hydrant::IRenderer * { return new T; },              \
+		 0 )
 
 VM_END_MODULE()
