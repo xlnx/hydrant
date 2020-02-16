@@ -5,6 +5,7 @@
 #include <functional>
 #include <typeindex>
 #include <typeinfo>
+#include <VMUtils/enum.hpp>
 #include <hydrant/core/glm_math.hpp>
 #include <cudafx/kernel.hpp>
 #include <cudafx/image.hpp>
@@ -20,17 +21,11 @@ struct IShaderTypeErased
 
 VM_EXPORT
 {
-	enum ShadingDevice
-	{
-		Cpu,
-		Cuda
-	};
+	VM_ENUM( ShadingDevice,
+			 Cpu, Cuda );
 
-	enum ShadingResult
-	{
-		Ok = 0,
-		Err
-	};
+	VM_ENUM( ShadingResult,
+			 Ok, Err );
 
 	struct IPixel
 	{
@@ -67,48 +62,27 @@ struct ImageDesc
 	char *data;
 
 	template <typename P>
-	void create_from_img( cufx::ImageView<P> const &img )
+	void create_from_img( cufx::ImageView<P> const &img, bool device )
 	{
 		resolution = ivec2{ img.width(), img.height() };
 		pixel_size = sizeof( P );
-		data = reinterpret_cast<char *>( &img.at_device( 0, 0 ) );
+		data = reinterpret_cast<char *>( device ? &img.at_device( 0, 0 ) : &img.at_host( 0, 0 ) );
 	}
 };
 
+using function_ptr_t = void ( * )();
+
 struct DeviceFunctionDesc
 {
-	void ( *fp )() = nullptr;
+	function_ptr_t fp = nullptr;
 	std::size_t offset = 0;
 
 	void copy_to_buffer( const void *udata, std::size_t size ) const;
 };
 
-struct BasicCudaShadingKernelArgs
-{
-	ShadingPass shading_pass;
-	ImageDesc image_desc;
-	DeviceFunctionDesc function_desc;
-};
-
-struct CudaRayEmitShadingKernelArgs : BasicCudaShadingKernelArgs
-{
-	ViewArgs view;
-};
-
-struct CudaPixelShadingKernelArgs : BasicCudaShadingKernelArgs
-{
-};
-
-struct CudaShadingArgs
-{
-	cufx::KernelLaunchInfo launch_info;
-	BasicCudaShadingKernelArgs *kernel_args;
-	IShaderTypeErased const *shader;
-};
-
 struct ShaderMeta
 {
-	std::map<ShadingDevice,
+	std::map<ShadingDevice::_enumerated,
 			 std::function<ShadingResult( void * )>>
 	  devices;
 	std::string name;
@@ -123,7 +97,7 @@ struct ShaderRegistry
 };
 
 template <typename P, typename F>
-__device__ void
+__host__ __device__ void
   ray_emit_shader_impl( Ray const &ray_in, void *pixel_out, void const *shader_in )
 {
 	P pixel = {};
@@ -142,13 +116,13 @@ __device__ void
 	*reinterpret_cast<P *>( pixel_out ) = pixel;
 }
 
-using p_ray_emit_shader_t = void ( * )( Ray const &, void *, void const * );
+using ray_emit_shader_t = void( Ray const &, void *, void const * );
 
 template <typename P, typename F>
-__device__ p_ray_emit_shader_t p_ray_emit_shader = ray_emit_shader_impl<P, F>;
+__device__ ray_emit_shader_t *p_ray_emit_shader = ray_emit_shader_impl<P, F>;
 
 template <typename P, typename F>
-__device__ void
+__host__ __device__ void
   pixel_shader_impl( void *pixel_in_out, void const *shader_in )
 {
 	auto &pixel = *reinterpret_cast<P *>( pixel_in_out );
@@ -160,13 +134,79 @@ __device__ void
 	pixel = pixel_reg;
 }
 
-using p_pixel_shader_t = void ( * )( void *, void const * );
+using pixel_shader_t = void( void *, void const * );
 
 template <typename P, typename F>
-__device__ p_pixel_shader_t p_pixel_shader = pixel_shader_impl<P, F>;
+__device__ pixel_shader_t *p_pixel_shader = pixel_shader_impl<P, F>;
+
+struct BasicShadingKernelArgs
+{
+	ShadingPass shading_pass;
+	ImageDesc image_desc;
+};
+
+struct BasicRayEmitShadingKernelArgs : BasicShadingKernelArgs
+{
+	ViewArgs view;
+};
+
+struct BasicPixelShadingKernelArgs : BasicShadingKernelArgs
+{
+};
+
+struct CpuShadingKernelLauncher
+{
+	function_ptr_t launcher;
+	IShaderTypeErased const *shader;
+};
+
+struct CpuRayEmitShadingKernelArgs : BasicRayEmitShadingKernelArgs, CpuShadingKernelLauncher
+{
+};
+
+struct CpuPixelShadingKernelArgs : BasicPixelShadingKernelArgs, CpuShadingKernelLauncher
+{
+};
+
+struct CudaShadingKernelLauncher
+{
+	DeviceFunctionDesc function_desc;
+};
+
+struct CudaRayEmitShadingKernelArgs : BasicRayEmitShadingKernelArgs, CudaShadingKernelLauncher
+{
+};
+
+struct CudaPixelShadingKernelArgs : BasicPixelShadingKernelArgs, CudaShadingKernelLauncher
+{
+};
+
+struct CudaShadingArgs
+{
+	cufx::KernelLaunchInfo launch_info;
+	BasicShadingKernelArgs *kernel_args;
+	IShaderTypeErased const *shader;
+};
+
+struct ThreadPoolInfo
+{
+	unsigned nthreads = 1;
+};
+
+struct CpuShadingArgs
+{
+	ThreadPoolInfo thread_pool_info;
+	BasicShadingKernelArgs *kernel_args;
+	IShaderTypeErased const *shader;
+};
 
 extern cufx::Kernel<void( CudaRayEmitShadingKernelArgs args )> ray_emit_kernel;
 extern cufx::Kernel<void( CudaPixelShadingKernelArgs args )> pixel_kernel;
+
+extern void ray_emit_task_dispatch( ThreadPoolInfo const &thread_pool_info,
+									CpuRayEmitShadingKernelArgs const &args );
+extern void pixel_task_dispatch( ThreadPoolInfo const &thread_pool_info,
+								 CpuPixelShadingKernelArgs const &args );
 
 struct ShaderRegistrar
 {
@@ -205,6 +245,28 @@ struct ShaderRegistrar
 				pixel_args.function_desc.offset = 0;
 				pixel_args.function_desc.copy_to_buffer( args.shader, sizeof( T ) );
 				pixel_kernel( args.launch_info, pixel_args ).launch();
+			}
+			return ShadingResult::Ok;
+		};
+		return *this;
+	}
+
+	template <typename T>
+	ShaderRegistrar &cpu()
+	{
+		_meta.devices[ ShadingDevice::Cpu ] =
+		  []( void *args_ptr ) -> ShadingResult {
+			auto &args = *reinterpret_cast<CpuShadingArgs *>( args_ptr );
+			if ( args.kernel_args->shading_pass == ShadingPass::RayEmit ) {
+				auto &ray_emit_args = *static_cast<CpuRayEmitShadingKernelArgs *>( args.kernel_args );
+				ray_emit_args.launcher = (function_ptr_t)ray_emit_shader_impl<typename T::Pixel, T>;
+				ray_emit_args.shader = args.shader;
+				ray_emit_task_dispatch( args.thread_pool_info, ray_emit_args );
+			} else {
+				auto &pixel_args = *static_cast<CpuPixelShadingKernelArgs *>( args.kernel_args );
+				pixel_args.launcher = (function_ptr_t)pixel_shader_impl<typename T::Pixel, T>;
+				pixel_args.shader = args.shader;
+				pixel_task_dispatch( args.thread_pool_info, pixel_args );
 			}
 			return ShadingResult::Ok;
 		};

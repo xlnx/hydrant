@@ -1,11 +1,11 @@
 #pragma once
 
 #include <cuda_runtime.h>
-#include <glm/glm.hpp>
+#include <glmcuda/glm.hpp>
 #define GLM_ENABLE_EXPERIMENTAL
-#include <glm/gtx/io.hpp>
-#include <glm/gtx/component_wise.hpp>
-#include <glm/gtc/matrix_transform.hpp>
+#include <glmcuda/gtx/io.hpp>
+#include <glmcuda/gtx/component_wise.hpp>
+#include <glmcuda/gtc/matrix_transform.hpp>
 #include <VMUtils/fmt.hpp>
 #include <VMUtils/attributes.hpp>
 #include <VMUtils/modules.hpp>
@@ -71,6 +71,47 @@ VM_EXPORT
 			return tfar > tnear;
 		}
 	};
+
+	template <length_t N, typename T,
+			  typename = typename std::enable_if<std::is_floating_point<T>::value>::type>
+	inline vec<N, unsigned char> saturate( vec<N, T> const &fp )
+	{
+		return vec<N, unsigned char>( clamp( fp * 255.f, vec<N, T>( 0. ), vec<N, T>( 255. ) ) );
+	}
+
+	template <length_t N, typename T,
+			  typename = typename std::enable_if<std::is_integral<T>::value>::type>
+	inline vec<N, float> saturate( vec<N, T> const &ip )
+	{
+		return clamp( vec<N, float>( ip ) / 255.f, vec<N, float>( 0. ), vec<N, float>( 1. ) );
+	}
+}
+
+template <length_t N, typename T, bool = std::is_integral<T>::value>
+struct SaturateToFloat;
+
+template <length_t N, typename T>
+struct SaturateToFloat<N, T, true>
+{
+	static vec<N, float> apply( vec<N, T> const &ip ) { return saturate( ip ); }
+};
+
+template <length_t N, typename T>
+struct SaturateToFloat<N, T, false>
+{
+	static vec<N, float> apply( vec<N, T> const &fp )
+	{
+		return clamp( vec<N, float>( fp ), vec<N, float>( 0. ), vec<N, float>( 1. ) );
+	}
+};
+
+VM_EXPORT
+{
+	template <length_t N, typename T>
+	inline vec<N, float> saturate_to_float( vec<N, T> const &p )
+	{
+		return SaturateToFloat<N, T>::apply( p );
+	}
 }
 
 VM_END_MODULE()

@@ -3,7 +3,7 @@
 raw_path=$1
 dst_dir=$2
 
-toolkit_dir=/root/voxel-compression/build/tools
+toolkit_dir=./build/external_build/varch/tools
 tmp_dir=/tmp/downsample
 
 dx=256
@@ -13,7 +13,7 @@ dz=256
 log_bs=6
 pad=2
 
-lvls=4
+lvls=1
 
 raw_base=$(basename ${raw_path})
 

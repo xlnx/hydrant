@@ -2,7 +2,7 @@
 
 #include <hydrant/core/glm_math.hpp>
 #include <hydrant/core/shader.hpp>
-#include <hydrant/core/sampler.hpp>
+#include <hydrant/bridge/sampler.hpp>
 #include <hydrant/pixel_template.hpp>
 
 #define MAX_CACHE_SIZE ( 64 )
@@ -18,8 +18,8 @@ VM_EXPORT
 		int wg_len_bytes;
 
 		vec2 cache_du;
-		Sampler chebyshev_tex;
-		Sampler present_tex;
+		Sampler chebyshev;
+		Sampler present;
 		Sampler cache_tex[ MAX_CACHE_SIZE ];
 	};
 }

@@ -1,24 +1,21 @@
 #pragma once
 
-#include <hydrant/renderer.hpp>
-#include <hydrant/const_texture_3d.hpp>
-#include <hydrant/cuda_image.hpp>
+#include <hydrant/basic_renderer.hpp>
 #include "blocks_shader.hpp"
 
 VM_BEGIN_MODULE( hydrant )
 
 VM_EXPORT
 {
-	struct BlocksRendererConfig : vm::json::Serializable<BlocksRendererConfig>
+	struct BlocksRendererParams : vm::json::Serializable<BlocksRendererParams>
 	{
-		VM_JSON_FIELD( std::string, mode ) = "volume";
+		VM_JSON_FIELD( BlocksRenderMode, mode ) = BlocksRenderMode::Volume;
 		VM_JSON_FIELD( float, density ) = 1e-2f;
 	};
 
-	struct BlocksRenderer : Renderer
+	struct BlocksRenderer : BasicRenderer<BlocksShader>
 	{
-		using Shader = BlocksShader;
-		using Super = Renderer;
+		using Super = BasicRenderer<BlocksShader>;
 
 		virtual bool init( std::shared_ptr<Dataset> const &dataset,
 						   RendererConfig const &cfg ) override;
@@ -27,12 +24,8 @@ VM_EXPORT
 									 Camera const &camera ) override;
 
 	private:
-		cufx::Device device = cufx::Device::scan()[ 0 ];
-		Shader shader;
-		Exhibit exhibit;
-		vm::Option<CudaImage<typename Shader::Pixel>> image;
-		vm::Option<ConstTexture3D<float>> chebyshev;
-		vm::Option<ConstTexture3D<float>> mean;
+		ThumbnailTexture<int> chebyshev;
+		ThumbnailTexture<float> mean;
 	};
 }
 

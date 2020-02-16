@@ -21,7 +21,7 @@ public:
 
 VM_EXPORT
 {
-	struct Unarchiver : UnarchiverImpl, vol::Unarchiver
+	struct Unarchiver : private UnarchiverImpl, public vol::Unarchiver
 	{
 		Unarchiver( std::string const &path ) :
 		  UnarchiverImpl( path ),

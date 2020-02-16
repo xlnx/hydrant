@@ -4,9 +4,9 @@ VM_BEGIN_MODULE( hydrant )
 
 struct VisBlocksShaderKernel : BlocksShader
 {
-	__device__ int
+	__host__ __device__ int
 	  skip_nblock_steps( Ray &ray, vec3 const &ip,
-						 float nblocks, float cdu, float step ) const
+						 int nblocks, float cdu, float step ) const
 	{
 		float tnear, tfar;
 		ray.intersect( Box3D{ ip, ip + 1.f }, tnear, tfar );
@@ -15,7 +15,7 @@ struct VisBlocksShaderKernel : BlocksShader
 		return (int)di;
 	}
 
-	__device__ void
+	__host__ __device__ void
 	  main( Pixel &pixel_in_out ) const
 	{
 		const auto cdu = 1.f / compMax( abs( pixel_in_out.ray.d ) );
@@ -27,11 +27,11 @@ struct VisBlocksShaderKernel : BlocksShader
 
 		while ( nsteps > 0 ) {
 			vec3 ip = floor( ray.o );
-			if ( float cd = chebyshev_tex.sample_3d<float>( ip ) ) {
+			if ( int cd = chebyshev.sample_3d<int>( ip ) ) {
 				nsteps -= skip_nblock_steps( ray, ip, cd, cdu, step );
 			} else {
 				auto rip = clamp( ip, bbox.min, bbox.max - 1.f ) / ( bbox.max - bbox.min );
-				if ( render_mode == BlocksRenderMode::BrmVolume ) {
+				if ( render_mode == BlocksRenderMode::Volume ) {
 					auto mean = mean_tex.sample_3d<float>( ip );
 					auto col = vec4( rip, 1.f ) * density * mean;
 					pixel.v += col * ( 1.f - pixel.v.w );
@@ -39,7 +39,7 @@ struct VisBlocksShaderKernel : BlocksShader
 						nsteps = 0;
 						break;
 					}
-				} else if ( render_mode == BlocksRenderMode::BrmSolid ) {
+				} else if ( render_mode == BlocksRenderMode::Solid ) {
 					pixel.v = vec4( rip, 1.f );
 					nsteps = 0;
 					break;
@@ -54,7 +54,8 @@ struct VisBlocksShaderKernel : BlocksShader
 
 REGISTER_SHADER_BUILDER(
   name( "vis_blocks_shader" )
-	.cuda<VisBlocksShaderKernel>(),
+	.cuda<VisBlocksShaderKernel>()
+	.cpu<VisBlocksShaderKernel>(),
   BlocksShader );
 
 VM_END_MODULE()
