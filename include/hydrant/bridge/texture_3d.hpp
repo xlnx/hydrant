@@ -28,7 +28,12 @@ VM_EXPORT
 		  opts( opts )
 		{
 			if ( opts.device.has_value() ) {
-				cuda.reset( new Cuda );
+				auto arr = opts.device.value()
+							 .alloc_arraynd<T, 3>( cufx::Extent{}
+													 .set_width( opts.dim.x )
+													 .set_height( opts.dim.y )
+													 .set_depth( opts.dim.z ) );
+				cuda.reset( new Cuda{ arr, cufx::Texture( arr, opts.opts ) } );
 			} else {
 				cpu.reset( new Cpu );
 				if ( opts.opts.read_mode == cufx::Texture::ReadMode::NormalizedFloat ) {
@@ -83,24 +88,17 @@ VM_EXPORT
 				}
 				fut = std::async( std::launch::deferred, [] { return cufx::Result(); } );
 			} else {
-				if ( !cuda->arr.has_value() ) {
-					cuda->arr = opts.device.value()
-								  .alloc_arraynd<T, 3>( cufx::Extent{}
-														  .set_width( opts.dim.x )
-														  .set_height( opts.dim.y )
-														  .set_depth( opts.dim.z ) );
-				}
-				fut = cufx::memory_transfer( cuda->arr.value(), view ).launch_async();
+				fut = cufx::memory_transfer( cuda->arr, view ).launch_async();
 			}
 			return std::async( std::launch::deferred,
 							   [&, f = std::move( fut )]() mutable {
 								   f.wait();
 								   auto res = f.get();
 								   if ( !res.ok() ) {
-									   vm::println( "{}", res.message() );
+									   vm::eprintln( "source texture failed: {}", res.message() );
 									   return false;
 								   }
-								   if ( cuda ) { cuda->tex = cufx::Texture( cuda->arr.value(), opts.opts ); }
+								   if ( cuda ) { cuda->tex = cufx::Texture( cuda->arr, opts.opts ); }
 								   return true;
 							   } );
 		}
@@ -108,7 +106,7 @@ VM_EXPORT
 		Sampler sampler() const
 		{
 			if ( cuda ) {
-				return cuda->tex.value();
+				return cuda->tex;
 			} else {
 				return *cpu->sampler.get();
 			}
@@ -124,8 +122,8 @@ VM_EXPORT
 	private:
 		struct Cuda
 		{
-			vm::Option<cufx::Array3D<T>> arr;
-			vm::Option<cufx::Texture> tex;
+			cufx::Array3D<T> arr;
+			cufx::Texture tex;
 		};
 		struct Cpu
 		{
