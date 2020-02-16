@@ -2,13 +2,15 @@
 
 #include <varch/thumbnail.hpp>
 #include <cudafx/device.hpp>
-#include <hydrant/const_texture_3d.hpp>
+#include <hydrant/image.hpp>
 #include <hydrant/renderer.hpp>
+#include <hydrant/const_texture_3d.hpp>
 
 VM_BEGIN_MODULE( hydrant )
 
 VM_EXPORT
 {
+	template <typename Shader>
 	struct BasicRenderer;
 
 	template <typename T>
@@ -18,14 +20,16 @@ VM_EXPORT
 
 	private:
 		std::shared_ptr<vol::Thumbnail<T>> thumb;
+		template <typename Shader>
 		friend struct BasicRenderer;
 	};
 
-	struct BasicRendererConfig : vm::json::Serializable<BasicRendererConfig>
+	struct BasicRendererParams : vm::json::Serializable<BasicRendererParams>
 	{
 		VM_JSON_FIELD( ShadingDevice, device ) = ShadingDevice::Cuda;
 	};
 
+	template <typename Shader>
 	struct BasicRenderer : IRenderer
 	{
 		bool init( std::shared_ptr<Dataset> const &dataset,
@@ -33,13 +37,33 @@ VM_EXPORT
 		{
 			if ( !IRenderer::init( dataset, cfg ) ) { return false; }
 
-			auto my_cfg = cfg.params.get<BasicRendererConfig>();
-			if ( my_cfg.device == ShadingDevice::Cuda ) {
+			auto params = cfg.params.get<BasicRendererParams>();
+			if ( params.device == ShadingDevice::Cuda ) {
 				device = cufx::Device::get_default();
 				if ( !device.has_value() ) {
 					vm::println( "cuda device not found, fallback to cpu render mode" );
 				}
 			}
+
+			auto img_opts = ImageOptions{}
+							  .set_device( device )
+							  .set_resolution( cfg.resolution );
+			film = Image<typename Shader::Pixel>( img_opts );
+
+			auto &lvl0 = dataset->meta.sample_levels[ 0 ];
+			dim = vec3( lvl0.archives[ 0 ].dim.x,
+						lvl0.archives[ 0 ].dim.y,
+						lvl0.archives[ 0 ].dim.z );
+			auto raw = vec3( lvl0.raw.x,
+							 lvl0.raw.y,
+							 lvl0.raw.z );
+			auto f_dim = raw / float( lvl0.archives[ 0 ].block_size );
+			exhibit = Exhibit{}
+						.set_center( f_dim / 2.f )
+						.set_size( f_dim );
+
+			shader.bbox = Box3D{ { 0, 0, 0 }, f_dim };
+			shader.step = 1e-2f * f_dim.x / 4.f;
 
 			return true;
 		}
@@ -62,6 +86,10 @@ VM_EXPORT
 
 	protected:
 		vm::Option<cufx::Device> device;
+		uvec3 dim;
+		Shader shader;
+		Exhibit exhibit;
+		Image<typename Shader::Pixel> film;
 	};
 }
 
