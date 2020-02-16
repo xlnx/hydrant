@@ -1,6 +1,4 @@
-#include <hydrant/renderer.hpp>
-#include "renderers/volume/volume.hpp"
-#include "renderers/blocks/blocks.hpp"
+#include <hydrant/core/renderer.hpp>
 
 VM_BEGIN_MODULE( hydrant )
 

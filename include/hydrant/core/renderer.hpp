@@ -2,15 +2,22 @@
 
 #include <string>
 #include <fstream>
+#include <cppfs/FilePath.h>
 #include <VMUtils/enum.hpp>
+#include <varch/package_meta.hpp>
 #include <hydrant/core/glm_math.hpp>
 #include <hydrant/core/raycaster.hpp>
-#include "dataset.hpp"
 
 VM_BEGIN_MODULE( hydrant )
 
 VM_EXPORT
 {
+	struct Dataset
+	{
+		VM_DEFINE_ATTRIBUTE( vol::PackageMeta, meta );
+		VM_DEFINE_ATTRIBUTE( cppfs::FilePath, root );
+	};
+
 	struct RendererConfig : vm::json::Serializable<RendererConfig>
 	{
 		VM_JSON_FIELD( glm::ivec2, resolution ) = { 512, 512 };
@@ -67,11 +74,12 @@ struct RendererRegistry
 #define REGISTER_RENDERER_UNIQ_HELPER( ctr, T, name ) \
 	REGISTER_RENDERER_UNIQ( ctr, T, name )
 
-#define REGISTER_RENDERER_UNIQ( ctr, T, name )                            \
-	static int                                                            \
-	  renderer_registrar__body__##ctr##__object =                         \
-		(::hydrant::__inner__::RendererRegistry::instance.types[ name ] = \
-		   []() -> ::hydrant::IRenderer * { return new T; },              \
-		 0 )
+#define REGISTER_RENDERER_UNIQ( ctr, T, name )                             \
+	static int                                                             \
+	  renderer_registrar__body__##ctr##__object =                          \
+		(                                                                  \
+		  ::hydrant::__inner__::RendererRegistry::instance.types[ name ] = \
+			[]() -> ::hydrant::IRenderer * { return new T; },              \
+		  0 )
 
 VM_END_MODULE()

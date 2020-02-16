@@ -7,7 +7,7 @@
 #include <VMUtils/fmt.hpp>
 #include <VMUtils/timer.hpp>
 #include <VMUtils/cmdline.hpp>
-#include <hydrant/renderer.hpp>
+#include <hydrant/core/renderer.hpp>
 
 using namespace std;
 using namespace vol;
@@ -72,5 +72,11 @@ int main( int argc, char **argv )
 	auto renderer = factory.create( cfg.render );
 	auto camera = Camera::from_config( cfg.camera );
 
-	renderer->offline_render( out.resolved(), camera );
+	{
+		vm::Timer::Scoped _( []( auto dt ) {
+			vm::println( "time: {}", dt.ms() );
+		} );
+
+		renderer->offline_render( out.resolved(), camera );
+	}
 }

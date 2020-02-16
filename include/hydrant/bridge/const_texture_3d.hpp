@@ -5,7 +5,7 @@
 #include <cudafx/texture.hpp>
 #include <cudafx/transfer.hpp>
 #include <hydrant/core/glm_math.hpp>
-#include <hydrant/sampler.hpp>
+#include <hydrant/bridge/sampler.hpp>
 
 VM_BEGIN_MODULE( hydrant )
 

@@ -2,9 +2,9 @@
 
 #include <varch/utils/io.hpp>
 #include <hydrant/unarchiver.hpp>
-#include <hydrant/renderer.hpp>
-#include <hydrant/const_texture_3d.hpp>
-#include <hydrant/image.hpp>
+#include <hydrant/core/renderer.hpp>
+#include <hydrant/bridge/const_texture_3d.hpp>
+#include <hydrant/bridge/image.hpp>
 #include <hydrant/buffer3d.hpp>
 #include "volume_shader.hpp"
 

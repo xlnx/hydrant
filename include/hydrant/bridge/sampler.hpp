@@ -2,7 +2,7 @@
 
 #include <cudafx/texture.hpp>
 #include <hydrant/core/glm_math.hpp>
-#include <hydrant/cpu_sampler.hpp>
+#include <hydrant/bridge/cpu_sampler.hpp>
 
 VM_BEGIN_MODULE( hydrant )
 

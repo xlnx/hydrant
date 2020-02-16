@@ -2,9 +2,9 @@
 
 #include <varch/thumbnail.hpp>
 #include <cudafx/device.hpp>
-#include <hydrant/image.hpp>
-#include <hydrant/renderer.hpp>
-#include <hydrant/const_texture_3d.hpp>
+#include <hydrant/bridge/image.hpp>
+#include <hydrant/core/renderer.hpp>
+#include <hydrant/bridge/const_texture_3d.hpp>
 
 VM_BEGIN_MODULE( hydrant )
 

@@ -3,7 +3,7 @@
 #include <VMUtils/enum.hpp>
 #include <hydrant/core/glm_math.hpp>
 #include <hydrant/core/shader.hpp>
-#include <hydrant/sampler.hpp>
+#include <hydrant/bridge/sampler.hpp>
 #include <hydrant/pixel_template.hpp>
 
 VM_BEGIN_MODULE( hydrant )
