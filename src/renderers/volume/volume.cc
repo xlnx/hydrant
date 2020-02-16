@@ -64,15 +64,18 @@ VM_EXPORT
 		for ( int i = 0; i != pidx.size(); ++i ) { pidx[ i ] = i; }
 		vm::println( "{}", block_idxs.size() );
 
-		cache.resize( MAX_CACHE_SIZE,
-					  Texture3DOptions{}
-						.set_dim( uu->padded_block_size() )
-						.set_device( device )
-						.set_opts( cufx::Texture::Options{}
-									 .set_address_mode( cufx::Texture::AddressMode::Wrap )
-									 .set_filter_mode( cufx::Texture::FilterMode::Linear )
-									 .set_read_mode( cufx::Texture::ReadMode::NormalizedFloat )
-									 .set_normalize_coords( true ) ) );
+		cache.reserve( MAX_CACHE_SIZE );
+		for ( int i = 0; i != MAX_CACHE_SIZE; ++i ) {
+			cache.emplace_back(
+			  Texture3DOptions{}
+				.set_dim( uu->padded_block_size() )
+				.set_device( device )
+				.set_opts( cufx::Texture::Options{}
+							 .set_address_mode( cufx::Texture::AddressMode::Wrap )
+							 .set_filter_mode( cufx::Texture::FilterMode::Linear )
+							 .set_read_mode( cufx::Texture::ReadMode::NormalizedFloat )
+							 .set_normalize_coords( true ) ) );
+		}
 
 		return true;
 	}
@@ -156,9 +159,17 @@ VM_EXPORT
 					} );
 
 					if ( i == 0 ) {
-						raycaster.cast_cpu( exhibit, camera, film.view(), shader );
+						raycaster.cast( exhibit,
+										camera,
+										film.view(),
+										shader,
+										RaycastingOptions{}
+										  .set_device( device ) );
 					} else {
-						raycaster.cast_cpu( film.view(), shader );
+						raycaster.cast( film.view(),
+										shader,
+										RaycastingOptions{}
+										  .set_device( device ) );
 					}
 				}
 			}

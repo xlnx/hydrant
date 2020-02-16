@@ -37,7 +37,12 @@ VM_EXPORT
 	void BlocksRenderer::offline_render( std::string const &dst_path,
 										 Camera const &camera )
 	{
-		raycaster.cast_cpu( exhibit, camera, film.view(), shader );
+		raycaster.cast( exhibit,
+						camera,
+						film.view(),
+						shader,
+						RaycastingOptions{}
+						  .set_device( device ) );
 		film.fetch_data().dump( dst_path );
 	}
 
