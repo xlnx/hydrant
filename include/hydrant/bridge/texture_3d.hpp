@@ -22,6 +22,10 @@ VM_EXPORT
 	template <typename T>
 	struct Texture3D
 	{
+	private:
+		using NormalizeFloatVec = vec<VecDim<T>::value, float>;
+
+	public:
 		Texture3D() = default;
 
 		Texture3D( Texture3DOptions const &opts ) :
@@ -37,7 +41,7 @@ VM_EXPORT
 			} else {
 				cpu.reset( new Cpu );
 				if ( opts.opts.read_mode == cufx::Texture::ReadMode::NormalizedFloat ) {
-					cpu->sampler.reset( new CpuSampler<float>( opts.dim, opts.opts ) );
+					cpu->sampler.reset( new CpuSampler<NormalizeFloatVec>( opts.dim, opts.opts ) );
 				} else {
 					cpu->sampler.reset( new CpuSampler<T>( opts.dim, opts.opts ) );
 				}
@@ -69,14 +73,14 @@ VM_EXPORT
 			std::future<cufx::Result> fut;
 			if ( cpu ) {
 				if ( need_saturate() ) {
-					if ( !cpu->norm_buf.has_value() ) { cpu->norm_buf = HostBuffer3D<float>( opts.dim ); }
+					if ( !cpu->norm_buf.has_value() ) { cpu->norm_buf = HostBuffer3D<NormalizeFloatVec>( opts.dim ); }
 					auto &buf = cpu->norm_buf.value();
 					buf.iterate_3d(
 					  [&]( auto idx ) {
 						  auto val = view.at( idx.x, idx.y, idx.z );
-						  buf[ idx ] = saturate_to_float( vec<1, unsigned char>( val ) ).x;
+						  buf[ idx ] = NormalizeFloatVec( saturate_to_float( val ) );
 					  } );
-					static_cast<CpuSampler<float> *>( cpu->sampler.get() )->source( cpu->norm_buf.value().data() );
+					static_cast<CpuSampler<NormalizeFloatVec> *>( cpu->sampler.get() )->source( buf.data() );
 				} else {
 					if ( !cpu->buf.has_value() ) { cpu->buf = HostBuffer3D<T>( opts.dim ); }
 					auto &buf = cpu->buf.value();
@@ -84,7 +88,7 @@ VM_EXPORT
 					  [&]( auto idx ) {
 						  buf[ idx ] = view.at( idx.x, idx.y, idx.z );
 					  } );
-					static_cast<CpuSampler<T> *>( cpu->sampler.get() )->source( cpu->buf.value().data() );
+					static_cast<CpuSampler<T> *>( cpu->sampler.get() )->source( buf.data() );
 				}
 				fut = std::async( std::launch::deferred, [] { return cufx::Result(); } );
 			} else {
@@ -108,7 +112,7 @@ VM_EXPORT
 			if ( cuda ) {
 				return cuda->tex;
 			} else {
-				return *cpu->sampler.get();
+				return *cpu->sampler;
 			}
 		}
 
@@ -116,6 +120,7 @@ VM_EXPORT
 		bool need_saturate() const
 		{
 			return !std::is_same<T, float>::value &&
+				   !std::is_same<T, NormalizeFloatVec>::value &&
 				   opts.opts.read_mode == cufx::Texture::ReadMode::NormalizedFloat;
 		}
 
@@ -129,7 +134,7 @@ VM_EXPORT
 		{
 			std::unique_ptr<ICpuSampler> sampler;
 			vm::Option<HostBuffer3D<T>> buf;
-			vm::Option<HostBuffer3D<float>> norm_buf;
+			vm::Option<HostBuffer3D<NormalizeFloatVec>> norm_buf;
 		};
 
 	private:

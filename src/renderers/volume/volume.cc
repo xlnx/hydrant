@@ -17,6 +17,8 @@ VM_EXPORT
 		auto my_cfg = cfg.params.get<VolumeRendererConfig>();
 		// shader.render_mode = my_cfg.mode == "volume" ? BrmVolume : BrmSolid;
 		// shader.density = my_cfg.density;
+		transfer_fn = TransferFn( my_cfg.transfer_fn, device );
+		shader.transfer_fn = transfer_fn.sampler();
 
 		auto &lvl0_arch = dataset->meta.sample_levels[ 0 ].archives[ 0 ];
 		uu.reset( new Unarchiver( dataset->root.resolve( lvl0_arch.path ).resolved() ) );

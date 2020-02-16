@@ -18,6 +18,7 @@ VM_EXPORT
 		int wg_len_bytes;
 
 		vec2 cache_du;
+		Sampler transfer_fn;
 		Sampler chebyshev;
 		Sampler present;
 		Sampler cache_tex[ MAX_CACHE_SIZE ];

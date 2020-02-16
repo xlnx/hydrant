@@ -14,7 +14,7 @@ public:
 	template <typename T, typename E>
 	T sample_2d_untyped( glm::vec<2, E> const &p ) const;
 	template <typename T, typename E>
-	T sample_1d_untyped( E const &x ) const;
+	T sample_1d_untyped( E x ) const;
 };
 
 VM_EXPORT
@@ -54,12 +54,20 @@ VM_EXPORT
 						 ip.x ];
 		}
 
-		T sample_1d( float const &x ) const
+		T sample_1d( float x ) const
 		{
 			float fx = opts.normalize_coords ? x * fdim.x : x;
-			int ix = floor( fx );
-			ix = clamp( ix, 0, idim.x - 1 );
-			return data[ ix ];
+			if ( opts.filter_mode == cufx::Texture::FilterMode::Linear ) {
+				int ix = floor( fx ), jx = ceil( fx );
+				float k = fx - ix;
+				ix = clamp( ix, 0, idim.x - 1 );
+				jx = clamp( jx, 0, idim.x - 1 );
+				return data[ ix ] * ( 1 - k ) + data[ jx ] * k;
+			} else {
+				int ix = floor( fx );
+				ix = clamp( ix, 0, idim.x - 1 );
+				return data[ ix ];
+			}
 		}
 
 	private:
@@ -81,7 +89,7 @@ T ICpuSampler::sample_2d_untyped( glm::vec<2, E> const &p ) const
 	return static_cast<CpuSampler<T> const *>( this )->sample_2d( glm::vec2( p ) );
 }
 template <typename T, typename E>
-T ICpuSampler::sample_1d_untyped( E const &x ) const
+T ICpuSampler::sample_1d_untyped( E x ) const
 {
 	return static_cast<CpuSampler<T> const *>( this )->sample_1d( float( x ) );
 }

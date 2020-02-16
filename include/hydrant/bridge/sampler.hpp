@@ -6,6 +6,43 @@
 
 VM_BEGIN_MODULE( hydrant )
 
+template <typename T>
+struct SampleCudaVecType
+{
+	using type = T;
+
+	static __host__ __device__ T to( T v )
+	{
+		return v;
+	}
+};
+
+#define DEF_SAMPLE_VEC_N( T, N )                                \
+	template <qualifier Q>                                      \
+	struct SampleCudaVecType<vec<N, T, Q>>                      \
+	{                                                           \
+		using type = T##N;                                      \
+                                                                \
+		static __host__ __device__                              \
+		  vec<N, T, Q>                                          \
+		  to( T##N v )                                          \
+		{                                                       \
+			return reinterpret_cast<vec<N, T, Q> const &>( v ); \
+		}                                                       \
+	}
+
+#define DEF_SAMPLE_VEC( T )   \
+	DEF_SAMPLE_VEC_N( T, 1 ); \
+	DEF_SAMPLE_VEC_N( T, 2 ); \
+	DEF_SAMPLE_VEC_N( T, 3 ); \
+	DEF_SAMPLE_VEC_N( T, 4 )
+
+DEF_SAMPLE_VEC( float );
+DEF_SAMPLE_VEC( double );
+
+DEF_SAMPLE_VEC( int );
+DEF_SAMPLE_VEC( uint );
+
 VM_EXPORT
 {
 	struct Sampler
@@ -30,7 +67,8 @@ VM_EXPORT
 		  sample_3d( glm::vec<3, E> const &p ) const
 		{
 #if CUFX_DEVICE_CODE
-			return tex3D<T>( cu, p.x, p.y, p.z );
+			using Helper = SampleCudaVecType<T>;
+			return Helper::to( tex3D<typename Helper::type>( cu, p.x, p.y, p.z ) );
 #else
 			return cpu->sample_3d_untyped<T>( p );
 #endif
@@ -40,7 +78,8 @@ VM_EXPORT
 		  sample_2d( glm::vec<2, E> const &p ) const
 		{
 #if CUFX_DEVICE_CODE
-			return tex2D<T>( cu, p.x, p.y );
+			using Helper = SampleCudaVecType<T>;
+			return Helper::to( tex2D<typename Helper::type>( cu, p.x, p.y ) );
 #else
 			return cpu->sample_2d_untyped<T>( p );
 #endif
@@ -50,7 +89,8 @@ VM_EXPORT
 		  sample_1d( E const &x ) const
 		{
 #if CUFX_DEVICE_CODE
-			return tex1D<T>( cu, x );
+			using Helper = SampleCudaVecType<T>;
+			return Helper::to( tex1D<typename Helper::type>( cu, x ) );
 #else
 			return cpu->sample_1d_untyped<T>( x );
 #endif

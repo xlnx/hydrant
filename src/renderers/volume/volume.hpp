@@ -4,6 +4,7 @@
 #include <hydrant/unarchiver.hpp>
 #include <hydrant/bridge/buffer3d.hpp>
 #include <hydrant/basic_renderer.hpp>
+#include <hydrant/transfer_fn.hpp>
 #include "volume_shader.hpp"
 
 VM_BEGIN_MODULE( hydrant )
@@ -12,6 +13,7 @@ VM_EXPORT
 {
 	struct VolumeRendererConfig : vm::json::Serializable<VolumeRendererConfig>
 	{
+		VM_JSON_FIELD( TransferFnConfig, transfer_fn );
 	};
 
 	struct VolumeRenderer : BasicRenderer<VolumeShader>
@@ -26,6 +28,8 @@ VM_EXPORT
 
 	private:
 		std::shared_ptr<Unarchiver> uu;
+
+		TransferFn transfer_fn;
 
 		ThumbnailTexture<int> chebyshev;
 

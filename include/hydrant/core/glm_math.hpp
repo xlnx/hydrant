@@ -85,6 +85,20 @@ VM_EXPORT
 	{
 		return clamp( vec<N, float>( ip ) / 255.f, vec<N, float>( 0. ), vec<N, float>( 1. ) );
 	}
+
+	template <typename T,
+			  typename = typename std::enable_if<std::is_integral<T>::value>::type>
+	inline float saturate( T p )
+	{
+		return saturate( vec<1, T>( p ) ).x;
+	}
+
+	template <typename T,
+			  typename = typename std::enable_if<std::is_floating_point<T>::value>::type>
+	inline unsigned char saturate( T p )
+	{
+		return saturate( vec<1, T>( p ) ).x;
+	}
 }
 
 template <length_t N, typename T, bool = std::is_integral<T>::value>
@@ -112,6 +126,24 @@ VM_EXPORT
 	{
 		return SaturateToFloat<N, T>::apply( p );
 	}
+
+	template <typename T>
+	inline float saturate_to_float( T p )
+	{
+		return saturate_to_float( vec<1, T>( p ) ).x;
+	}
+
+	template <typename T>
+	struct VecDim
+	{
+		static constexpr length_t value = 1;
+	};
+
+	template <length_t N, typename T, qualifier Q>
+	struct VecDim<vec<N, T, Q>>
+	{
+		static constexpr length_t value = N;
+	};
 }
 
 VM_END_MODULE()

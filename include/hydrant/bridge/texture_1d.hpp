@@ -14,7 +14,6 @@ VM_EXPORT
 	struct Texture1DOptions
 	{
 		VM_DEFINE_ATTRIBUTE( unsigned, length );
-		VM_DEFINE_ATTRIBUTE( ConstVoidPtr, data );
 		VM_DEFINE_ATTRIBUTE( cufx::Texture::Options, opts );
 		VM_DEFINE_ATTRIBUTE( vm::Option<cufx::Device>, device );
 	};
@@ -22,6 +21,10 @@ VM_EXPORT
 	template <typename T>
 	struct Texture1D
 	{
+	private:
+		using NormalizeFloatVec = vec<VecDim<T>::value, float>;
+
+	public:
 		Texture1D() = default;
 
 		Texture1D( Texture1DOptions const &opts ) :
@@ -29,30 +32,60 @@ VM_EXPORT
 		{
 			if ( opts.device.has_value() ) {
 				auto arr = opts.device.value().alloc_arraynd<T, 1>( opts.length );
-				auto view = cufx::MemoryView1D<T>( (T *)opts.data, opts.length );
-				cufx::memory_transfer( arr, view )
-				  .launch();
-				auto tex = cufx::Texture( arr, opts.opts );
-				cuda.reset( new Cuda{ arr, tex, view } );
+				cuda.reset( new Cuda{ arr, cufx::Texture( arr, opts.opts ) } );
 			} else {
-				cpu.reset( new CpuSampler<T>(
-				  reinterpret_cast<T const *>( opts.data ),
-				  glm::uvec3( opts.length, 0, 0 ),
-				  opts.opts ) );
+				cpu.reset( new Cpu );
+				if ( opts.opts.read_mode == cufx::Texture::ReadMode::NormalizedFloat ) {
+					cpu->sampler.reset( new CpuSampler<NormalizeFloatVec>( glm::uvec3( opts.length, 0, 0 ), opts.opts ) );
+				} else {
+					cpu->sampler.reset( new CpuSampler<T>( glm::uvec3( opts.length, 0, 0 ), opts.opts ) );
+				}
 			}
 		}
 
 	public:
-		Sampler update_sampler()
+		void source( T const *ptr, bool temporary = true )
 		{
-			if ( cuda ) {
-				cufx::memory_transfer( cuda->arr, cuda->view )
-				  .launch();
-				cuda->tex = cufx::Texture( cuda->arr, opts.opts );
-				return cuda->tex;
+			if ( !temporary && cpu && !need_saturate() ) {
+				static_cast<CpuSampler<T> *>( cpu->sampler.get() )->source( ptr );
+				if ( cpu->buf ) cpu->buf = vm::None{};
 			} else {
-				return cpu.get();
+				cufx::MemoryView1D<T> ptr_view( const_cast<T *>( ptr ), opts.length );
+				auto fut = source( ptr_view );
+				fut.wait();
 			}
+		}
+		std::future<bool> source( cufx::MemoryView1D<T> const &view )
+		{
+			std::future<cufx::Result> fut;
+			if ( cpu ) {
+				if ( need_saturate() ) {
+					if ( !cpu->norm_buf.has_value() ) { cpu->norm_buf = std::vector<NormalizeFloatVec>( opts.length ); }
+					auto &buf = cpu->norm_buf.value();
+					std::transform( view.ptr(), view.ptr() + view.size(), buf.begin(),
+									[]( auto val ) { return NormalizeFloatVec( saturate_to_float( val ) ); } );
+					static_cast<CpuSampler<NormalizeFloatVec> *>( cpu->sampler.get() )->source( cpu->norm_buf.value().data() );
+				} else {
+					if ( !cpu->buf.has_value() ) { cpu->buf = std::vector<NormalizeFloatVec>( opts.length ); }
+					auto &buf = cpu->buf.value();
+					memcpy( buf.data(), view.ptr(), view.size() * sizeof( T ) );
+					static_cast<CpuSampler<T> *>( cpu->sampler.get() )->source( cpu->buf.value().data() );
+				}
+				fut = std::async( std::launch::deferred, [] { return cufx::Result(); } );
+			} else {
+				fut = cufx::memory_transfer( cuda->arr, view ).launch_async();
+			}
+			return std::async( std::launch::deferred,
+							   [&, f = std::move( fut )]() mutable {
+								   f.wait();
+								   auto res = f.get();
+								   if ( !res.ok() ) {
+									   vm::eprintln( "source texture failed: {}", res.message() );
+									   return false;
+								   }
+								   if ( cuda ) { cuda->tex = cufx::Texture( cuda->arr, opts.opts ); }
+								   return true;
+							   } );
 		}
 
 		Sampler sampler() const
@@ -60,8 +93,16 @@ VM_EXPORT
 			if ( cuda ) {
 				return cuda->tex;
 			} else {
-				return cpu.get();
+				return *cpu->sampler;
 			}
+		}
+
+	private:
+		bool need_saturate() const
+		{
+			return !std::is_same<T, float>::value &&
+				   !std::is_same<T, NormalizeFloatVec>::value &&
+				   opts.opts.read_mode == cufx::Texture::ReadMode::NormalizedFloat;
 		}
 
 	private:
@@ -69,12 +110,18 @@ VM_EXPORT
 		{
 			cufx::Array1D<T> arr;
 			cufx::Texture tex;
-			cufx::MemoryView1D<T> view;
+		};
+
+		struct Cpu
+		{
+			std::unique_ptr<ICpuSampler> sampler;
+			vm::Option<std::vector<T>> buf;
+			vm::Option<std::vector<NormalizeFloatVec>> norm_buf;
 		};
 
 	private:
 		std::shared_ptr<Cuda> cuda;
-		std::shared_ptr<CpuSampler<T>> cpu;
+		std::shared_ptr<Cpu> cpu;
 		Texture1DOptions opts;
 	};
 }

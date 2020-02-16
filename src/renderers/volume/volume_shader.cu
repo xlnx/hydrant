@@ -49,7 +49,8 @@ struct VolumeShaderKernel : VolumeShader
 				auto present_id = present.sample_3d<int>( ip );
 				if ( present_id != -1 ) {
 					auto pt = ( cache_du.x + ( ray.o - ip ) ) * cache_du.y;
-					auto val = vec4( cache_tex[ present_id ].sample_3d<float>( pt ) );
+					auto spl = cache_tex[ present_id ].sample_3d<float>( pt );
+					auto val = transfer_fn.sample_1d<vec4>( spl );
 					// auto val = vec4( ray.o - ip, 1 );
 					// auto val = vec4( chebyshev.sample_3d<float2>( ip ).x );
 					auto col = val * density;
