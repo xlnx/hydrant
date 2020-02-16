@@ -4,7 +4,7 @@
 #include <cudafx/device.hpp>
 #include <hydrant/bridge/image.hpp>
 #include <hydrant/core/renderer.hpp>
-#include <hydrant/bridge/const_texture_3d.hpp>
+#include <hydrant/bridge/texture_3d.hpp>
 
 VM_BEGIN_MODULE( hydrant )
 
@@ -14,9 +14,9 @@ VM_EXPORT
 	struct BasicRenderer;
 
 	template <typename T>
-	struct ThumbnailTexture : ConstTexture3D<T>
+	struct ThumbnailTexture : Texture3D<T>
 	{
-		using ConstTexture3D<T>::ConstTexture3D;
+		using Texture3D<T>::Texture3D;
 
 	private:
 		std::shared_ptr<vol::Thumbnail<T>> thumb;
@@ -70,17 +70,16 @@ VM_EXPORT
 
 	public:
 		template <typename T>
-		ThumbnailTexture<T> load_thumbnail( std::string const &path )
+		ThumbnailTexture<T> create_texture( std::shared_ptr<vol::Thumbnail<T>> const &thumb )
 		{
-			std::shared_ptr<vol::Thumbnail<T>> thumb( new vol::Thumbnail<T>( path ) );
-			auto opts = ConstTexture3DOptions{}
+			auto opts = Texture3DOptions{}
 						  .set_device( device )
 						  .set_dim( thumb->dim.x, thumb->dim.y, thumb->dim.z )
-						  .set_data( thumb->data() )
 						  .set_opts( cufx::Texture::Options::as_array()
 									   .set_address_mode( cufx::Texture::AddressMode::Clamp ) );
 			ThumbnailTexture<T> texture( opts );
 			if ( !device.has_value() ) { texture.thumb = thumb; }
+			texture.source( thumb->data() );
 			return texture;
 		}
 

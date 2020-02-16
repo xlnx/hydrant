@@ -16,7 +16,7 @@ VM_EXPORT
 	struct BlocksShader : IShader<StdVec4Pixel>
 	{
 		Sampler mean_tex;
-		Sampler chebyshev_tex;
+		Sampler chebyshev;
 		BlocksRenderMode render_mode = BlocksRenderMode::Volume;
 		float density = 1e-2f;
 	};

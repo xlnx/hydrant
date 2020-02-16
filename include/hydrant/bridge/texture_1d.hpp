@@ -11,35 +11,25 @@ VM_BEGIN_MODULE( hydrant )
 
 VM_EXPORT
 {
-	struct ConstTexture3DOptions
+	struct Texture1DOptions
 	{
-		using ConstVoidPtr = void const *;
-
-		VM_DEFINE_ATTRIBUTE( glm::uvec3, dim );
+		VM_DEFINE_ATTRIBUTE( unsigned, length );
 		VM_DEFINE_ATTRIBUTE( ConstVoidPtr, data );
 		VM_DEFINE_ATTRIBUTE( cufx::Texture::Options, opts );
 		VM_DEFINE_ATTRIBUTE( vm::Option<cufx::Device>, device );
 	};
 
 	template <typename T>
-	struct ConstTexture3D
+	struct Texture1D
 	{
-		ConstTexture3D() = default;
+		Texture1D() = default;
 
-		ConstTexture3D( ConstTexture3DOptions const &opts ) :
+		Texture1D( Texture1DOptions const &opts ) :
 		  opts( opts )
 		{
 			if ( opts.device.has_value() ) {
-				auto extent = cufx::Extent{}
-								.set_width( opts.dim.x )
-								.set_height( opts.dim.y )
-								.set_depth( opts.dim.z );
-				auto view_info = cufx::MemoryView2DInfo{}
-								   .set_stride( opts.dim.x * sizeof( T ) )
-								   .set_width( opts.dim.x )
-								   .set_height( opts.dim.y );
-				auto arr = opts.device.value().alloc_arraynd<T, 3>( extent );
-				auto view = cufx::MemoryView3D<T>( (T *)opts.data, view_info, extent );
+				auto arr = opts.device.value().alloc_arraynd<T, 1>( opts.length );
+				auto view = cufx::MemoryView1D<T>( (T *)opts.data, opts.length );
 				cufx::memory_transfer( arr, view )
 				  .launch();
 				auto tex = cufx::Texture( arr, opts.opts );
@@ -47,13 +37,13 @@ VM_EXPORT
 			} else {
 				cpu.reset( new CpuSampler<T>(
 				  reinterpret_cast<T const *>( opts.data ),
-				  opts.dim,
+				  glm::uvec3( opts.length, 0, 0 ),
 				  opts.opts ) );
 			}
 		}
 
 	public:
-		Sampler update()
+		Sampler update_sampler()
 		{
 			if ( cuda ) {
 				cufx::memory_transfer( cuda->arr, cuda->view )
@@ -65,7 +55,7 @@ VM_EXPORT
 			}
 		}
 
-		Sampler get() const
+		Sampler sampler() const
 		{
 			if ( cuda ) {
 				return cuda->tex;
@@ -77,15 +67,15 @@ VM_EXPORT
 	private:
 		struct Cuda
 		{
-			cufx::Array3D<T> arr;
+			cufx::Array1D<T> arr;
 			cufx::Texture tex;
-			cufx::MemoryView3D<T> view;
+			cufx::MemoryView1D<T> view;
 		};
 
 	private:
 		std::shared_ptr<Cuda> cuda;
 		std::shared_ptr<CpuSampler<T>> cpu;
-		ConstTexture3DOptions opts;
+		Texture1DOptions opts;
 	};
 }
 

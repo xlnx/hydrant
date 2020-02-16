@@ -21,13 +21,15 @@ VM_EXPORT
 
 		auto &lvl0_arch = dataset->meta.sample_levels[ 0 ].archives[ 0 ];
 
-		chebyshev = load_thumbnail<int>(
+		auto chebyshev_thumb = std::make_shared<vol::Thumbnail<int>>(
 		  dataset->root.resolve( lvl0_arch.thumbnails[ "chebyshev" ] ).resolved() );
-		shader.chebyshev_tex = chebyshev.get();
+		chebyshev = create_texture( chebyshev_thumb );
+		shader.chebyshev = chebyshev.sampler();
 
-		mean = load_thumbnail<float>(
+		auto mean_thumb = std::make_shared<vol::Thumbnail<float>>(
 		  dataset->root.resolve( lvl0_arch.thumbnails[ "mean" ] ).resolved() );
-		shader.mean_tex = mean.get();
+		mean = create_texture( mean_thumb );
+		shader.mean_tex = mean.sampler();
 
 		return true;
 	}

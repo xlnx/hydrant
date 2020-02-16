@@ -27,7 +27,7 @@ struct VisBlocksShaderKernel : BlocksShader
 
 		while ( nsteps > 0 ) {
 			vec3 ip = floor( ray.o );
-			if ( int cd = chebyshev_tex.sample_3d<int>( ip ) ) {
+			if ( int cd = chebyshev.sample_3d<int>( ip ) ) {
 				nsteps -= skip_nblock_steps( ray, ip, cd, cdu, step );
 			} else {
 				auto rip = clamp( ip, bbox.min, bbox.max - 1.f ) / ( bbox.max - bbox.min );

@@ -10,11 +10,11 @@ VM_EXPORT
 	{
 		void write_to( unsigned char dst[ 4 ] )
 		{
-			auto v = clamp( this->v * 255.f, vec4( 0.f ), vec4( 255.f ) );
-			dst[ 0 ] = (unsigned char)( v.x );
-			dst[ 1 ] = (unsigned char)( v.y );
-			dst[ 2 ] = (unsigned char)( v.z );
-			dst[ 3 ] = (unsigned char)( 255 );
+			auto d = saturate( this->v );
+			dst[ 0 ] = d.x;
+			dst[ 1 ] = d.y;
+			dst[ 2 ] = d.z;
+			dst[ 3 ] = 255;
 		}
 
 	public:

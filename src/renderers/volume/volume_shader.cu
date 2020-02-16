@@ -4,7 +4,7 @@ VM_BEGIN_MODULE( hydrant )
 
 struct VolumeShaderKernel : VolumeShader
 {
-	__device__ int
+	__host__ __device__ int
 	  skip_nblock_steps( Ray &ray, vec3 const &ip,
 						 int nblocks, float cdu, float step ) const
 	{
@@ -15,7 +15,7 @@ struct VolumeShaderKernel : VolumeShader
 		return (int)di;
 	}
 
-	__device__ void
+	__host__ __device__ void
 	  main( Pixel &pixel_in_out ) const
 	{
 		// #define MAXX ( 8 )
@@ -43,15 +43,15 @@ struct VolumeShaderKernel : VolumeShader
 
 		while ( nsteps > 0 ) {
 			vec3 ip = floor( ray.o );
-			if ( int cd = chebyshev_tex.sample_3d<int>( ip ) ) {
+			if ( int cd = chebyshev.sample_3d<int>( ip ) ) {
 				nsteps -= skip_nblock_steps( ray, ip, cd, cdu, step );
 			} else {
-				auto present_id = present_tex.sample_3d<int>( ip );
+				auto present_id = present.sample_3d<int>( ip );
 				if ( present_id != -1 ) {
 					auto pt = ( cache_du.x + ( ray.o - ip ) ) * cache_du.y;
 					auto val = vec4( cache_tex[ present_id ].sample_3d<float>( pt ) );
 					// auto val = vec4( ray.o - ip, 1 );
-					// auto val = vec4( chebyshev_tex.sample_3d<float2>( ip ).x );
+					// auto val = vec4( chebyshev.sample_3d<float2>( ip ).x );
 					auto col = val * density;
 					pixel.v += col * ( 1.f - pixel.v.w );
 					if ( pixel.v.w > opacity_threshold ) {

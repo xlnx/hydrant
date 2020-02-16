@@ -2,10 +2,8 @@
 
 #include <varch/utils/io.hpp>
 #include <hydrant/unarchiver.hpp>
-#include <hydrant/core/renderer.hpp>
-#include <hydrant/bridge/const_texture_3d.hpp>
-#include <hydrant/bridge/image.hpp>
-#include <hydrant/buffer3d.hpp>
+#include <hydrant/bridge/buffer3d.hpp>
+#include <hydrant/basic_renderer.hpp>
 #include "volume_shader.hpp"
 
 VM_BEGIN_MODULE( hydrant )
@@ -14,13 +12,11 @@ VM_EXPORT
 {
 	struct VolumeRendererConfig : vm::json::Serializable<VolumeRendererConfig>
 	{
-		VM_JSON_FIELD( ShadingDevice, device ) = ShadingDevice::Cuda;
 	};
 
-	struct VolumeRenderer : IRenderer
+	struct VolumeRenderer : BasicRenderer<VolumeShader>
 	{
-		using Shader = VolumeShader;
-		using Super = IRenderer;
+		using Super = BasicRenderer<VolumeShader>;
 
 		virtual bool init( std::shared_ptr<Dataset> const &dataset,
 						   RendererConfig const &cfg ) override;
@@ -29,17 +25,14 @@ VM_EXPORT
 									 Camera const &camera ) override;
 
 	private:
-		vm::Option<cufx::Device> device;
-		Shader shader;
-		Exhibit exhibit;
-
 		std::shared_ptr<Unarchiver> uu;
 
-		Image<typename Shader::Pixel> image;
-		ConstTexture3D<int> chebyshev;
-		ConstTexture3D<int> present;
+		ThumbnailTexture<int> chebyshev;
 
-		vm::Option<Buffer3D<int>> present_buf;
+		Texture3D<int> present;
+		HostBuffer3D<int> present_buf;
+
+		std::vector<Texture3D<unsigned char>> cache;
 
 		std::vector<vol::Idx> block_idxs;
 		std::vector<glm::vec3> block_ccs;

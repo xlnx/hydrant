@@ -19,9 +19,8 @@ VM_EXPORT
 		  cu( tex )
 		{
 		}
-		template <typename T>
-		Sampler( CpuSampler<T> *sampler ) :
-		  cpu( sampler )
+		Sampler( ICpuSampler &sampler ) :
+		  cpu( &sampler )
 		{
 		}
 
@@ -61,7 +60,7 @@ VM_EXPORT
 		union
 		{
 			cudaTextureObject_t cu;
-			CpuSamplerUntyped *cpu;
+			ICpuSampler *cpu;
 		};
 	};
 }

@@ -60,7 +60,6 @@ int main( int argc, char **argv )
 	auto in = FilePath( a.get<string>( "in" ) );
 	ensure_dir( in.resolved() );
 	auto out = FilePath( a.get<string>( "out" ) );
-	auto device = cufx::Device::scan()[ 0 ];
 
 	auto cfg_path = FilePath( a.get<string>( "config" ) );
 	ensure_file( cfg_path.resolved() );
