@@ -8,7 +8,7 @@ VM_EXPORT
 {
 	struct StdVec4Pixel : IPixel
 	{
-		void write_to( unsigned char dst[ 4 ] )
+		void write_to( unsigned char dst[ 4 ] ) const
 		{
 			auto d = saturate( this->v );
 			dst[ 0 ] = d.x;

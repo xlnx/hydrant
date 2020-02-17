@@ -82,17 +82,18 @@ VM_EXPORT
 		return true;
 	}
 
-	void VolumeRenderer::offline_render( std::string const &dst_path,
-										 Camera const &camera )
+	cufx::Image<> VolumeRenderer::offline_render( Camera const &camera )
 	{
 		// cufx::MemoryView3D<int> chebyshev_view( chebyshev.data(), thumbnail_view_info, thumbnail_extent );
 		// cufx::memory_transfer( sampler_arr, block_view_3d, cudaPos{ 0, 0, 0 } ).launch();
 		// cufx::Texture sampler_texture( sampler_arr, cufx::Texture::Options::as_array() );
 
+		auto film = create_film();
+
 		auto pad_bs = uu->padded_block_size();
 		auto block_bytes = pad_bs * pad_bs * pad_bs;
 
-		std::shared_ptr<Buffer3D<unsigned char>> buf;
+		std::shared_ptr<IBuffer3D<unsigned char>> buf;
 		if ( device.has_value() ) {
 			buf.reset( new GlobalBuffer3D<unsigned char>( uvec3( pad_bs ), device.value() ) );
 		} else {
@@ -177,7 +178,7 @@ VM_EXPORT
 			}
 		}
 
-		film.fetch_data().dump( dst_path );
+		return film.fetch_data().dump();
 	}
 
 	REGISTER_RENDERER( VolumeRenderer, "Volume" );

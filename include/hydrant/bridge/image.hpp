@@ -21,9 +21,9 @@ VM_EXPORT
 
 		Image( ImageOptions const &opts )
 		{
-			cufx::Image<P> img_0( opts.resolution.x, opts.resolution.y );
+			auto img_0 = cufx::Image<P>( opts.resolution.x, opts.resolution.y );
 			auto view = img_0.view();
-			img.reset( new Img{ std::move( img_0 ), view } );
+			img.reset( new Img{ img_0, view } );
 			if ( opts.device.has_value() ) {
 				cuda.reset( new Cuda{ opts.device.value().alloc_image_swap( img->img ) } );
 				img->view = img->view.with_device_memory( cuda->swap.second );
@@ -32,9 +32,9 @@ VM_EXPORT
 		}
 
 		cufx::ImageView<P> &view() const { return img->view; }
-		cufx::Image<P> &get() const { return img->img; }
+		cufx::Image<P> get() const { return img->img; }
 
-		cufx::Image<P> &fetch_data() const
+		cufx::Image<P> fetch_data() const
 		{
 			if ( cuda ) { img->view.copy_from_device().launch(); }
 			return img->img;

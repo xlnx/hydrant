@@ -1,6 +1,7 @@
 #include <varch/utils/io.hpp>
 #include <varch/unarchive/unarchiver.hpp>
 #include <hydrant/basic_renderer.hpp>
+#include <hydrant/core/render_loop.hpp>
 #include "blocks.hpp"
 
 using namespace std;
@@ -34,16 +35,16 @@ VM_EXPORT
 		return true;
 	}
 
-	void BlocksRenderer::offline_render( std::string const &dst_path,
-										 Camera const &camera )
+	cufx::Image<> BlocksRenderer::offline_render( Camera const &camera )
 	{
+		auto film = create_film();
 		raycaster.cast( exhibit,
 						camera,
 						film.view(),
 						shader,
 						RaycastingOptions{}
 						  .set_device( device ) );
-		film.fetch_data().dump( dst_path );
+		return film.fetch_data().dump();
 	}
 
 	REGISTER_RENDERER( BlocksRenderer, "Blocks" );

@@ -11,14 +11,14 @@ VM_BEGIN_MODULE( hydrant )
 VM_EXPORT
 {
 	template <typename T>
-	struct Buffer3D : vm::Dynamic
+	struct IBuffer3D : vm::Dynamic
 	{
-		Buffer3D() :
+		IBuffer3D() :
 		  d( 0 ), dx( 0 )
 		{
 		}
 
-		Buffer3D( uvec3 const &d, uvec3 const &dx ) :
+		IBuffer3D( uvec3 const &d, uvec3 const &dx ) :
 		  d( d ), dx( dx )
 		{
 		}
@@ -37,13 +37,13 @@ VM_EXPORT
 	};
 
 	template <typename T>
-	struct GlobalBuffer3D : Buffer3D<T>
+	struct GlobalBuffer3D : IBuffer3D<T>
 	{
 		GlobalBuffer3D() = default;
 
 		GlobalBuffer3D( uvec3 const &dim, cufx::Device const &device,
 						T const &e = T() ) :
-		  Buffer3D<T>( dim, uvec3( 1, dim.x, dim.x * dim.y ) ),
+		  IBuffer3D<T>( dim, uvec3( 1, dim.x, dim.x * dim.y ) ),
 		  glob( device.alloc_global( dim.x * dim.y * dim.z * sizeof( T ) ) )
 		{
 		}
@@ -75,12 +75,12 @@ VM_EXPORT
 	};
 
 	template <typename T>
-	struct HostBuffer3D : Buffer3D<T>
+	struct HostBuffer3D : IBuffer3D<T>
 	{
 		HostBuffer3D() = default;
 
 		HostBuffer3D( uvec3 const &dim, T const &e = T() ) :
-		  Buffer3D<T>( dim, uvec3( 1, dim.x, dim.x * dim.y ) ),
+		  IBuffer3D<T>( dim, uvec3( 1, dim.x, dim.x * dim.y ) ),
 		  buf( dim.x * dim.y * dim.z, e )
 		{
 		}

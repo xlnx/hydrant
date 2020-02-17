@@ -20,8 +20,7 @@ VM_EXPORT
 		virtual bool init( std::shared_ptr<Dataset> const &dataset,
 						   RendererConfig const &cfg ) override;
 
-		virtual void offline_render( std::string const &dst_path,
-									 Camera const &camera ) override;
+		virtual cufx::Image<> offline_render( Camera const &camera ) override;
 
 	private:
 		ThumbnailTexture<int> chebyshev;

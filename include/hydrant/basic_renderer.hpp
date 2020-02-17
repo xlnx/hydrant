@@ -5,6 +5,7 @@
 #include <hydrant/bridge/image.hpp>
 #include <hydrant/core/renderer.hpp>
 #include <hydrant/bridge/texture_3d.hpp>
+#include <hydrant/core/render_loop.hpp>
 
 VM_BEGIN_MODULE( hydrant )
 
@@ -45,11 +46,6 @@ VM_EXPORT
 				}
 			}
 
-			auto img_opts = ImageOptions{}
-							  .set_device( device )
-							  .set_resolution( cfg.resolution );
-			film = Image<typename Shader::Pixel>( img_opts );
-
 			auto &lvl0 = dataset->meta.sample_levels[ 0 ];
 			dim = vec3( lvl0.archives[ 0 ].dim.x,
 						lvl0.archives[ 0 ].dim.y,
@@ -70,7 +66,7 @@ VM_EXPORT
 
 	public:
 		template <typename T>
-		ThumbnailTexture<T> create_texture( std::shared_ptr<vol::Thumbnail<T>> const &thumb )
+		ThumbnailTexture<T> create_texture( std::shared_ptr<vol::Thumbnail<T>> const &thumb ) const
 		{
 			auto opts = Texture3DOptions{}
 						  .set_device( device )
@@ -83,12 +79,19 @@ VM_EXPORT
 			return texture;
 		}
 
+		Image<typename Shader::Pixel> create_film() const
+		{
+			auto img_opts = ImageOptions{}
+							  .set_device( device )
+							  .set_resolution( resolution );
+			return Image<typename Shader::Pixel>( img_opts );
+		}
+
 	protected:
 		vm::Option<cufx::Device> device;
 		uvec3 dim;
 		Shader shader;
 		Exhibit exhibit;
-		Image<typename Shader::Pixel> film;
 	};
 }
 

@@ -76,6 +76,6 @@ int main( int argc, char **argv )
 			vm::println( "time: {}", dt.ms() );
 		} );
 
-		renderer->offline_render( out.resolved(), camera );
+		renderer->offline_render( camera ).dump( out.resolved() );
 	}
 }
