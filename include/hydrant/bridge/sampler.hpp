@@ -7,7 +7,7 @@
 VM_BEGIN_MODULE( hydrant )
 
 template <typename T>
-struct SampleCudaVecType
+struct CudaVecType
 {
 	using type = T;
 
@@ -19,7 +19,7 @@ struct SampleCudaVecType
 
 #define DEF_SAMPLE_VEC_N( T, N )                                \
 	template <qualifier Q>                                      \
-	struct SampleCudaVecType<vec<N, T, Q>>                      \
+	struct CudaVecType<vec<N, T, Q>>                            \
 	{                                                           \
 		using type = T##N;                                      \
                                                                 \
@@ -67,7 +67,7 @@ VM_EXPORT
 		  sample_3d( glm::vec<3, E> const &p ) const
 		{
 #if CUFX_DEVICE_CODE
-			using Helper = SampleCudaVecType<T>;
+			using Helper = CudaVecType<T>;
 			return Helper::to( tex3D<typename Helper::type>( cu, p.x, p.y, p.z ) );
 #else
 			return cpu->sample_3d_untyped<T>( p );
@@ -78,7 +78,7 @@ VM_EXPORT
 		  sample_2d( glm::vec<2, E> const &p ) const
 		{
 #if CUFX_DEVICE_CODE
-			using Helper = SampleCudaVecType<T>;
+			using Helper = CudaVecType<T>;
 			return Helper::to( tex2D<typename Helper::type>( cu, p.x, p.y ) );
 #else
 			return cpu->sample_2d_untyped<T>( p );
@@ -89,7 +89,7 @@ VM_EXPORT
 		  sample_1d( E const &x ) const
 		{
 #if CUFX_DEVICE_CODE
-			using Helper = SampleCudaVecType<T>;
+			using Helper = CudaVecType<T>;
 			return Helper::to( tex1D<typename Helper::type>( cu, x ) );
 #else
 			return cpu->sample_1d_untyped<T>( x );

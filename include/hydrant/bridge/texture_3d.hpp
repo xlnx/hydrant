@@ -24,6 +24,7 @@ VM_EXPORT
 	{
 	private:
 		using NormalizeFloatVec = vec<VecDim<T>::value, float>;
+		using CudaVec = typename CudaVecType<T>::type;
 
 	public:
 		Texture3D() = default;
@@ -33,10 +34,10 @@ VM_EXPORT
 		{
 			if ( opts.device.has_value() ) {
 				auto arr = opts.device.value()
-							 .alloc_arraynd<T, 3>( cufx::Extent{}
-													 .set_width( opts.dim.x )
-													 .set_height( opts.dim.y )
-													 .set_depth( opts.dim.z ) );
+							 .alloc_arraynd<CudaVec, 3>( cufx::Extent{}
+														   .set_width( opts.dim.x )
+														   .set_height( opts.dim.y )
+														   .set_depth( opts.dim.z ) );
 				cuda.reset( new Cuda{ arr, cufx::Texture( arr, opts.opts ) } );
 			} else {
 				cpu.reset( new Cpu );
@@ -92,7 +93,9 @@ VM_EXPORT
 				}
 				fut = std::async( std::launch::deferred, [] { return cufx::Result(); } );
 			} else {
-				fut = cufx::memory_transfer( cuda->arr, view ).launch_async();
+				fut = cufx::memory_transfer( cuda->arr,
+											 reinterpret_cast<cufx::MemoryView3D<CudaVec> const &>( view ) )
+						.launch_async();
 			}
 			return std::async( std::launch::deferred,
 							   [&, f = std::move( fut )]() mutable {
@@ -127,7 +130,7 @@ VM_EXPORT
 	private:
 		struct Cuda
 		{
-			cufx::Array3D<T> arr;
+			cufx::Array3D<CudaVec> arr;
 			cufx::Texture tex;
 		};
 		struct Cpu
