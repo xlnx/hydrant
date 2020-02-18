@@ -36,7 +36,7 @@ __global__ void
 
 CUFX_DEFINE_KERNEL( ray_emit_kernel, ray_emit_kernel_impl );
 
-/* Pixel Kernel Impl */
+/* Ray March Kernel Impl */
 
 __global__ void
   ray_march_kernel_impl( CudaRayMarchKernelArgs args )
@@ -54,5 +54,24 @@ __global__ void
 }
 
 CUFX_DEFINE_KERNEL( ray_march_kernel, ray_march_kernel_impl );
+
+/* Pixel Kernel Impl */
+
+__global__ void
+  pixel_kernel_impl( CudaPixelKernelArgs args )
+{
+	uint x = blockIdx.x * blockDim.x + threadIdx.x;
+	uint y = blockIdx.y * blockDim.y + threadIdx.y;
+
+	if ( x >= args.image_desc.resolution.x || y >= args.image_desc.resolution.y ) {
+		return;
+	}
+
+	auto shader = (pixel_shader_t *)args.function_desc.fp;
+	shader( args.image_desc.data + args.image_desc.pixel_size * ( args.image_desc.resolution.x * y + x ),
+			args.dst_desc.data + args.dst_desc.pixel_size * ( args.dst_desc.resolution.x * y + x ) );
+}
+
+CUFX_DEFINE_KERNEL( pixel_kernel, pixel_kernel_impl );
 
 VM_END_MODULE()

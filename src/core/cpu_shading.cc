@@ -49,4 +49,23 @@ void ray_march_task_dispatch( ThreadPoolInfo const &thread_pool_info,
 	for ( auto &t : threads ) { t.join(); }
 }
 
+void pixel_task_dispatch( ThreadPoolInfo const &thread_pool_info,
+						  CpuPixelKernelArgs const &args )
+{
+	vector<thread> threads;
+	for ( int i = 0; i < thread_pool_info.nthreads; ++i ) {
+		threads.emplace_back(
+		  [&, y0 = i] {
+			  auto launcher = (pixel_shader_t *)args.launcher;
+			  for ( int y = y0; y < args.image_desc.resolution.y; y += thread_pool_info.nthreads ) {
+				  for ( int x = 0; x < args.image_desc.resolution.x; ++x ) {
+					  launcher( args.image_desc.data + args.image_desc.pixel_size * ( args.image_desc.resolution.x * y + x ),
+								args.dst_desc.data + args.dst_desc.pixel_size * ( args.dst_desc.resolution.x * y + x ) );
+				  }
+			  }
+		  } );
+	}
+	for ( auto &t : threads ) { t.join(); }
+}
+
 VM_END_MODULE()

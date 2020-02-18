@@ -305,7 +305,9 @@ VM_EXPORT
 		// 				 .set_b( b );
 
 		auto film = create_film();
-		cufx::Image<> frame( resolution.x, resolution.y );
+		Image<cufx::StdByte4Pixel> frame( ImageOptions{}
+											.set_device( device )
+											.set_resolution( resolution ) );
 		// auto et = exhibit.get_matrix();
 		// auto pad_bs = uu->padded_block_size();
 		// auto block_bytes = pad_bs * pad_bs * pad_bs;
@@ -380,17 +382,23 @@ VM_EXPORT
 					ns1 += dt.ns().cnt();
 				} );
 
+				auto opts = RaycastingOptions{}.set_device( device );
+
 				raycaster.cast( exhibit,
 								loop.camera,
 								film.view(),
 								shader,
-								RaycastingOptions{}
-								  .set_device( device ) );
+								opts );
+
+				raycaster.cast( film.view(),
+								frame.view(),
+								shader,
+								opts );
 			}
 			// }
 
-			auto frame = film.fetch_data().dump();
-			loop.on_frame( frame );
+			auto fp = frame.fetch_data();
+			loop.on_frame( fp );
 		}
 
 		loop.after_loop();

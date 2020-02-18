@@ -46,6 +46,7 @@ enum ShadingPass
 {
 	RayEmit,
 	RayMarch,
+	Pixel
 };
 
 struct ViewArgs
@@ -96,6 +97,8 @@ struct ShaderRegistry
 	std::map<std::type_index, ShaderMeta> meta;
 };
 
+/* ray emit shader */
+
 template <typename P, typename F>
 __host__ __device__ void
   ray_emit_shader_impl( Ray const &ray_in, void *pixel_out, void const *shader_in )
@@ -121,6 +124,8 @@ using ray_emit_shader_t = void( Ray const &, void *, void const * );
 template <typename P, typename F>
 __device__ ray_emit_shader_t *p_ray_emit_shader = ray_emit_shader_impl<P, F>;
 
+/* ray march shader */
+
 template <typename P, typename F>
 __host__ __device__ void
   ray_march_shader_impl( void *pixel_in_out, void const *shader_in )
@@ -139,6 +144,25 @@ using ray_march_shader_t = void( void *, void const * );
 template <typename P, typename F>
 __device__ ray_march_shader_t *p_ray_march_shader = ray_march_shader_impl<P, F>;
 
+/* pixel shader */
+
+template <typename P, typename F>
+__host__ __device__ void
+  pixel_shader_impl( void const *pixel_in, void *pixel_out )
+{
+	auto &pixel_in_ = *reinterpret_cast<P const *>( pixel_in );
+	auto &pixel_out_ = *reinterpret_cast<uchar4 *>( pixel_out );
+
+	pixel_in_.write_to( pixel_out_ );
+}
+
+using pixel_shader_t = void( void const *, void * );
+
+template <typename P, typename F>
+__device__ pixel_shader_t *p_pixel_shader = pixel_shader_impl<P, F>;
+
+/* kernel args defination */
+
 struct BasicKernelArgs
 {
 	ShadingPass shading_pass;
@@ -152,6 +176,11 @@ struct BasicRayEmitKernelArgs : BasicKernelArgs
 
 struct BasicRayMarchKernelArgs : BasicKernelArgs
 {
+};
+
+struct BasicPixelKernelArgs : BasicKernelArgs
+{
+	ImageDesc dst_desc;
 };
 
 struct CpuKernelLauncher
@@ -168,6 +197,10 @@ struct CpuRayMarchKernelArgs : BasicRayMarchKernelArgs, CpuKernelLauncher
 {
 };
 
+struct CpuPixelKernelArgs : BasicPixelKernelArgs, CpuKernelLauncher
+{
+};
+
 struct CudaShadingKernelLauncher
 {
 	DeviceFunctionDesc function_desc;
@@ -178,6 +211,10 @@ struct CudaRayEmitKernelArgs : BasicRayEmitKernelArgs, CudaShadingKernelLauncher
 };
 
 struct CudaRayMarchKernelArgs : BasicRayMarchKernelArgs, CudaShadingKernelLauncher
+{
+};
+
+struct CudaPixelKernelArgs : BasicPixelKernelArgs, CudaShadingKernelLauncher
 {
 };
 
@@ -202,11 +239,14 @@ struct CpuShadingArgs
 
 extern cufx::Kernel<void( CudaRayEmitKernelArgs args )> ray_emit_kernel;
 extern cufx::Kernel<void( CudaRayMarchKernelArgs args )> ray_march_kernel;
+extern cufx::Kernel<void( CudaPixelKernelArgs args )> pixel_kernel;
 
 extern void ray_emit_task_dispatch( ThreadPoolInfo const &thread_pool_info,
 									CpuRayEmitKernelArgs const &args );
 extern void ray_march_task_dispatch( ThreadPoolInfo const &thread_pool_info,
 									 CpuRayMarchKernelArgs const &args );
+extern void pixel_task_dispatch( ThreadPoolInfo const &thread_pool_info,
+								 CpuPixelKernelArgs const &args );
 
 struct ShaderRegistrar
 {
@@ -229,22 +269,21 @@ struct ShaderRegistrar
 		_meta.devices[ ShadingDevice::Cuda ] =
 		  []( void *args_ptr ) -> ShadingResult {
 			auto &args = *reinterpret_cast<CudaShadingArgs *>( args_ptr );
-			if ( args.kernel_args->shading_pass == ShadingPass::RayEmit ) {
-				auto &ray_emit_args = *static_cast<CudaRayEmitKernelArgs *>( args.kernel_args );
-				cudaMemcpyFromSymbol( &ray_emit_args.function_desc.fp,
-									  p_ray_emit_shader<typename T::Pixel, T>,
-									  sizeof( ray_emit_args.function_desc.fp ) );
-				ray_emit_args.function_desc.offset = 0;
-				ray_emit_args.function_desc.copy_to_buffer( args.shader, sizeof( T ) );
-				ray_emit_kernel( args.launch_info, ray_emit_args ).launch();
-			} else {
-				auto &ray_march_args = *static_cast<CudaRayMarchKernelArgs *>( args.kernel_args );
-				cudaMemcpyFromSymbol( &ray_march_args.function_desc.fp,
-									  p_ray_march_shader<typename T::Pixel, T>,
-									  sizeof( ray_march_args.function_desc.fp ) );
-				ray_march_args.function_desc.offset = 0;
-				ray_march_args.function_desc.copy_to_buffer( args.shader, sizeof( T ) );
-				ray_march_kernel( args.launch_info, ray_march_args ).launch();
+			switch ( args.kernel_args->shading_pass ) {
+#define HYDRANT_CUDA_SHADER_IMPL_PASS( Pass, Lower )                              \
+	case ShadingPass::Pass: {                                                     \
+		auto &kargs = *static_cast<Cuda##Pass##KernelArgs *>( args.kernel_args ); \
+		cudaMemcpyFromSymbol( &kargs.function_desc.fp,                            \
+							  p_##Lower##_shader<typename T::Pixel, T>,           \
+							  sizeof( kargs.function_desc.fp ) );                 \
+		kargs.function_desc.offset = 0;                                           \
+		kargs.function_desc.copy_to_buffer( args.shader, sizeof( T ) );           \
+		Lower##_kernel( args.launch_info, kargs ).launch();                       \
+	} break
+				HYDRANT_CUDA_SHADER_IMPL_PASS( RayEmit, ray_emit );
+				HYDRANT_CUDA_SHADER_IMPL_PASS( RayMarch, ray_march );
+				HYDRANT_CUDA_SHADER_IMPL_PASS( Pixel, pixel );
+#undef HYDRANT_CUDA_SHADER_IMPL_PASS
 			}
 			return ShadingResult::Ok;
 		};
@@ -257,16 +296,18 @@ struct ShaderRegistrar
 		_meta.devices[ ShadingDevice::Cpu ] =
 		  []( void *args_ptr ) -> ShadingResult {
 			auto &args = *reinterpret_cast<CpuShadingArgs *>( args_ptr );
-			if ( args.kernel_args->shading_pass == ShadingPass::RayEmit ) {
-				auto &ray_emit_args = *static_cast<CpuRayEmitKernelArgs *>( args.kernel_args );
-				ray_emit_args.launcher = (function_ptr_t)ray_emit_shader_impl<typename T::Pixel, T>;
-				ray_emit_args.shader = args.shader;
-				ray_emit_task_dispatch( args.thread_pool_info, ray_emit_args );
-			} else {
-				auto &ray_march_args = *static_cast<CpuRayMarchKernelArgs *>( args.kernel_args );
-				ray_march_args.launcher = (function_ptr_t)ray_march_shader_impl<typename T::Pixel, T>;
-				ray_march_args.shader = args.shader;
-				ray_march_task_dispatch( args.thread_pool_info, ray_march_args );
+			switch ( args.kernel_args->shading_pass ) {
+#define HYDRANT_CPU_SHADER_IMPL_PASS( Pass, Lower )                                 \
+	case ShadingPass::Pass: {                                                       \
+		auto &kargs = *static_cast<Cpu##Pass##KernelArgs *>( args.kernel_args );    \
+		kargs.launcher = (function_ptr_t)Lower##_shader_impl<typename T::Pixel, T>; \
+		kargs.shader = args.shader;                                                 \
+		Lower##_task_dispatch( args.thread_pool_info, kargs );                      \
+	} break
+				HYDRANT_CPU_SHADER_IMPL_PASS( RayEmit, ray_emit );
+				HYDRANT_CPU_SHADER_IMPL_PASS( RayMarch, ray_march );
+				HYDRANT_CPU_SHADER_IMPL_PASS( Pixel, pixel );
+#undef HYDRANT_CPU_SHADER_IMPL_PASS
 			}
 			return ShadingResult::Ok;
 		};
