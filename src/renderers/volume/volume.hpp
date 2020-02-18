@@ -14,6 +14,7 @@ VM_EXPORT
 	struct VolumeRendererConfig : vm::json::Serializable<VolumeRendererConfig>
 	{
 		VM_JSON_FIELD( TransferFnConfig, transfer_fn );
+		VM_JSON_FIELD( float, density ) = 1e-2f;
 	};
 
 	struct VolumeRenderer : BasicRenderer<VolumeShader>

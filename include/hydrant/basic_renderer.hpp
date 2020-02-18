@@ -28,6 +28,7 @@ VM_EXPORT
 	struct BasicRendererParams : vm::json::Serializable<BasicRendererParams>
 	{
 		VM_JSON_FIELD( ShadingDevice, device ) = ShadingDevice::Cuda;
+		VM_JSON_FIELD( int, max_steps ) = 500;
 	};
 
 	template <typename Shader>
@@ -45,6 +46,7 @@ VM_EXPORT
 					vm::println( "cuda device not found, fallback to cpu render mode" );
 				}
 			}
+			shader.max_steps = params.max_steps;
 
 			auto &lvl0 = dataset->meta.sample_levels[ 0 ];
 			dim = vec3( lvl0.archives[ 0 ].dim.x,

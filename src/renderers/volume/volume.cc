@@ -14,10 +14,10 @@ VM_EXPORT
 	{
 		if ( !Super::init( dataset, cfg ) ) { return false; }
 
-		auto my_cfg = cfg.params.get<VolumeRendererConfig>();
-		// shader.render_mode = my_cfg.mode == "volume" ? BrmVolume : BrmSolid;
-		// shader.density = my_cfg.density;
-		transfer_fn = TransferFn( my_cfg.transfer_fn, device );
+		auto params = cfg.params.get<VolumeRendererConfig>();
+		// shader.render_mode = params.mode == "volume" ? BrmVolume : BrmSolid;
+		shader.density = params.density;
+		transfer_fn = TransferFn( params.transfer_fn, device );
 		shader.transfer_fn = transfer_fn.sampler();
 
 		auto &lvl0_arch = dataset->meta.sample_levels[ 0 ].archives[ 0 ];

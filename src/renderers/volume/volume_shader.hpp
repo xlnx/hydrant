@@ -17,6 +17,7 @@ VM_EXPORT
 		int wg_max_emit_cnt;
 		int wg_len_bytes;
 
+		float density;
 		vec2 cache_du;
 		Sampler transfer_fn;
 		Sampler chebyshev;

@@ -35,7 +35,6 @@ struct VolumeShaderKernel : VolumeShader
 
 		const auto cdu = 1.f / compMax( abs( pixel_in_out.ray.d ) );
 		const auto opacity_threshold = 0.95f;
-		const auto density = 1e-1f;
 
 		auto pixel = pixel_in_out;
 		auto &ray = pixel.ray;
