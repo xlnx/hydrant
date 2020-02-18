@@ -305,6 +305,7 @@ VM_EXPORT
 		// 				 .set_b( b );
 
 		auto film = create_film();
+		cufx::Image<> frame( resolution.x, resolution.y );
 		// auto et = exhibit.get_matrix();
 		// auto pad_bs = uu->padded_block_size();
 		// auto block_bytes = pad_bs * pad_bs * pad_bs;
