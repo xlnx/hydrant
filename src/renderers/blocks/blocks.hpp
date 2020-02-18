@@ -17,10 +17,10 @@ VM_EXPORT
 	{
 		using Super = BasicRenderer<BlocksShader>;
 
-		virtual bool init( std::shared_ptr<Dataset> const &dataset,
-						   RendererConfig const &cfg ) override;
+		bool init( std::shared_ptr<Dataset> const &dataset,
+				   RendererConfig const &cfg ) override;
 
-		virtual cufx::Image<> offline_render( Camera const &camera ) override;
+		cufx::Image<> offline_render( Camera const &camera ) override;
 
 	private:
 		ThumbnailTexture<int> chebyshev;

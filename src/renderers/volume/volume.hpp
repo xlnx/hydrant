@@ -21,10 +21,12 @@ VM_EXPORT
 	{
 		using Super = BasicRenderer<VolumeShader>;
 
-		virtual bool init( std::shared_ptr<Dataset> const &dataset,
-						   RendererConfig const &cfg ) override;
+		bool init( std::shared_ptr<Dataset> const &dataset,
+				   RendererConfig const &cfg ) override;
 
-		virtual cufx::Image<> offline_render( Camera const &camera ) override;
+		cufx::Image<> offline_render( Camera const &camera ) override;
+
+		void render_loop( IRenderLoop &loop ) override;
 
 	private:
 		std::shared_ptr<Unarchiver> uu;
