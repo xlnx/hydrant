@@ -29,22 +29,22 @@ VM_EXPORT
 	public:
 		Texture3D() = default;
 
-		Texture3D( Texture3DOptions const &opts ) :
-		  opts( opts )
+		Texture3D( Texture3DOptions const &tex_opts ) :
+		  opts( new Texture3DOptions( tex_opts ) )
 		{
-			if ( opts.device.has_value() ) {
-				auto arr = opts.device.value()
+			if ( opts->device.has_value() ) {
+				auto arr = opts->device.value()
 							 .alloc_arraynd<CudaVec, 3>( cufx::Extent{}
-														   .set_width( opts.dim.x )
-														   .set_height( opts.dim.y )
-														   .set_depth( opts.dim.z ) );
-				cuda.reset( new Cuda{ arr, cufx::Texture( arr, opts.opts ) } );
+														   .set_width( opts->dim.x )
+														   .set_height( opts->dim.y )
+														   .set_depth( opts->dim.z ) );
+				cuda.reset( new Cuda{ arr, cufx::Texture( arr, opts->opts ) } );
 			} else {
 				cpu.reset( new Cpu );
-				if ( opts.opts.read_mode == cufx::Texture::ReadMode::NormalizedFloat ) {
-					cpu->sampler.reset( new CpuSampler<NormalizeFloatVec>( opts.dim, opts.opts ) );
+				if ( opts->opts.read_mode == cufx::Texture::ReadMode::NormalizedFloat ) {
+					cpu->sampler.reset( new CpuSampler<NormalizeFloatVec>( opts->dim, opts->opts ) );
 				} else {
-					cpu->sampler.reset( new CpuSampler<T>( opts.dim, opts.opts ) );
+					cpu->sampler.reset( new CpuSampler<T>( opts->dim, opts->opts ) );
 				}
 			}
 		}
@@ -58,13 +58,13 @@ VM_EXPORT
 			} else {
 				cufx::MemoryView3D<T> ptr_view( const_cast<T *>( ptr ),
 												cufx::MemoryView2DInfo{}
-												  .set_stride( opts.dim.x * sizeof( T ) )
-												  .set_width( opts.dim.x )
-												  .set_height( opts.dim.y ),
+												  .set_stride( opts->dim.x * sizeof( T ) )
+												  .set_width( opts->dim.x )
+												  .set_height( opts->dim.y ),
 												cufx::Extent{}
-												  .set_width( opts.dim.x )
-												  .set_height( opts.dim.y )
-												  .set_depth( opts.dim.z ) );
+												  .set_width( opts->dim.x )
+												  .set_height( opts->dim.y )
+												  .set_depth( opts->dim.z ) );
 				auto fut = source( ptr_view );
 				fut.wait();
 			}
@@ -74,7 +74,7 @@ VM_EXPORT
 			std::future<cufx::Result> fut;
 			if ( cpu ) {
 				if ( need_saturate() ) {
-					if ( !cpu->norm_buf.has_value() ) { cpu->norm_buf = HostBuffer3D<NormalizeFloatVec>( opts.dim ); }
+					if ( !cpu->norm_buf.has_value() ) { cpu->norm_buf = HostBuffer3D<NormalizeFloatVec>( opts->dim ); }
 					auto &buf = cpu->norm_buf.value();
 					buf.iterate_3d(
 					  [&]( auto idx ) {
@@ -83,7 +83,7 @@ VM_EXPORT
 					  } );
 					static_cast<CpuSampler<NormalizeFloatVec> *>( cpu->sampler.get() )->source( buf.data() );
 				} else {
-					if ( !cpu->buf.has_value() ) { cpu->buf = HostBuffer3D<T>( opts.dim ); }
+					if ( !cpu->buf.has_value() ) { cpu->buf = HostBuffer3D<T>( opts->dim ); }
 					auto &buf = cpu->buf.value();
 					buf.iterate_3d(
 					  [&]( auto idx ) {
@@ -105,7 +105,7 @@ VM_EXPORT
 									   vm::eprintln( "source texture failed: {}", res.message() );
 									   return false;
 								   }
-								   if ( cuda ) { cuda->tex = cufx::Texture( cuda->arr, opts.opts ); }
+								   if ( cuda ) { cuda->tex = cufx::Texture( cuda->arr, opts->opts ); }
 								   return true;
 							   } );
 		}
@@ -124,7 +124,7 @@ VM_EXPORT
 		{
 			return !std::is_same<T, float>::value &&
 				   !std::is_same<T, NormalizeFloatVec>::value &&
-				   opts.opts.read_mode == cufx::Texture::ReadMode::NormalizedFloat;
+				   opts->opts.read_mode == cufx::Texture::ReadMode::NormalizedFloat;
 		}
 
 	private:
@@ -143,7 +143,7 @@ VM_EXPORT
 	private:
 		std::shared_ptr<Cuda> cuda;
 		std::shared_ptr<Cpu> cpu;
-		Texture3DOptions opts;
+		std::shared_ptr<Texture3DOptions> opts;
 	};
 }
 

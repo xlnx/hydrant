@@ -74,28 +74,32 @@ VM_EXPORT
 
 	template <length_t N, typename T,
 			  typename = typename std::enable_if<std::is_floating_point<T>::value>::type>
-	inline vec<N, unsigned char> saturate( vec<N, T> const &fp )
+	__host__ __device__ inline vec<N, unsigned char>
+	  saturate( vec<N, T> const &fp )
 	{
 		return vec<N, unsigned char>( clamp( fp * 255.f, vec<N, T>( 0. ), vec<N, T>( 255. ) ) );
 	}
 
 	template <length_t N, typename T,
 			  typename = typename std::enable_if<std::is_integral<T>::value>::type>
-	inline vec<N, float> saturate( vec<N, T> const &ip )
+	__host__ __device__ inline vec<N, float>
+	  saturate( vec<N, T> const &ip )
 	{
 		return clamp( vec<N, float>( ip ) / 255.f, vec<N, float>( 0. ), vec<N, float>( 1. ) );
 	}
 
 	template <typename T,
 			  typename = typename std::enable_if<std::is_integral<T>::value>::type>
-	inline float saturate( T p )
+	__host__ __device__ inline float
+	  saturate( T p )
 	{
 		return saturate( vec<1, T>( p ) ).x;
 	}
 
 	template <typename T,
 			  typename = typename std::enable_if<std::is_floating_point<T>::value>::type>
-	inline unsigned char saturate( T p )
+	__host__ __device__ inline unsigned char
+	  saturate( T p )
 	{
 		return saturate( vec<1, T>( p ) ).x;
 	}
@@ -107,13 +111,15 @@ struct SaturateToFloat;
 template <length_t N, typename T>
 struct SaturateToFloat<N, T, true>
 {
-	static vec<N, float> apply( vec<N, T> const &ip ) { return saturate( ip ); }
+	static __host__ __device__ vec<N, float>
+	  apply( vec<N, T> const &ip ) { return saturate( ip ); }
 };
 
 template <length_t N, typename T>
 struct SaturateToFloat<N, T, false>
 {
-	static vec<N, float> apply( vec<N, T> const &fp )
+	static __host__ __device__ vec<N, float>
+	  apply( vec<N, T> const &fp )
 	{
 		return clamp( vec<N, float>( fp ), vec<N, float>( 0. ), vec<N, float>( 1. ) );
 	}
@@ -122,13 +128,15 @@ struct SaturateToFloat<N, T, false>
 VM_EXPORT
 {
 	template <length_t N, typename T>
-	inline vec<N, float> saturate_to_float( vec<N, T> const &p )
+	inline __host__ __device__ vec<N, float>
+	  saturate_to_float( vec<N, T> const &p )
 	{
 		return SaturateToFloat<N, T>::apply( p );
 	}
 
 	template <typename T>
-	inline float saturate_to_float( T p )
+	inline __host__ __device__ float
+	  saturate_to_float( T p )
 	{
 		return saturate_to_float( vec<1, T>( p ) ).x;
 	}

@@ -5,8 +5,6 @@
 #include <hydrant/bridge/sampler.hpp>
 #include <hydrant/pixel_template.hpp>
 
-#define MAX_CACHE_SIZE ( 64 )
-
 VM_BEGIN_MODULE( hydrant )
 
 VM_EXPORT
@@ -44,7 +42,7 @@ VM_EXPORT
 		Sampler transfer_fn;
 		Sampler chebyshev;
 		Sampler present;
-		BlockSampler block_sampler[ MAX_CACHE_SIZE ];
+		BlockSampler const *block_sampler;
 	};
 }
 
