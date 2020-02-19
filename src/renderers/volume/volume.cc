@@ -316,7 +316,7 @@ VM_EXPORT
 			.set_device( device )
 			.set_resolution( resolution ),
 		  loop,
-		  [&]( auto &frame ) {
+		  [&]( auto &frame, auto frame_idx ) {
 			  std::size_t ns = 0, ns1 = 0;
 
 			  vm::Timer::Scoped timer( [&]( auto dt ) {
@@ -353,6 +353,10 @@ VM_EXPORT
 								  shader,
 								  opts );
 			  }
+		  },
+		  [&]( auto &frame, auto frame_idx ) {
+			  auto fp = frame.fetch_data();
+			  loop.on_frame( fp );
 		  } );
 
 		loop_drv.run();
