@@ -17,7 +17,9 @@ VM_EXPORT
 
 	struct GlfwRenderLoop : IRenderLoop
 	{
-		GlfwRenderLoop( GlfwRenderLoopOptions const &opts ) :
+		GlfwRenderLoop( GlfwRenderLoopOptions const &opts,
+						Camera const &camera ) :
+		  IRenderLoop( camera ),
 		  resolution( opts.resolution )
 		{
 			glfwInit();

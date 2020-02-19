@@ -103,7 +103,7 @@ VM_EXPORT
 			auto et = e.get_matrix();
 			auto ivt = inverse( c.get_matrix() );
 			args.view.trans = et * ivt;
-			args.view.itg_fovy = 1. / tan( M_PI / 3 / 2 );
+			args.view.ctg_fovy_2 = c.ctg_fovy_2;
 			args.view.ray_o = et * vec4{ c.position.x, c.position.y, c.position.z, 1 };
 		}
 

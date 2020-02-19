@@ -81,7 +81,7 @@ struct DebGlfwRenderLoop : GlfwRenderLoop
 	void post_frame() override
 	{
 		GlfwRenderLoop::post_frame();
-		camera = Camera::from_orbit( orbit );
+		camera.update_params( orbit );
 	}
 
 	void on_frame( cufx::Image<> &frame ) override
@@ -127,7 +127,6 @@ int main( int argc, char **argv )
 
 	RendererFactory factory( in );
 	auto renderer = factory.create( cfg.render );
-	auto camera = Camera::from_config( cfg.camera );
 
 	if ( !a.exist( "rt" ) ) {
 		auto out = FilePath( a.get<string>( "out" ) );
@@ -136,13 +135,13 @@ int main( int argc, char **argv )
 			vm::println( "time: {}", dt.ms() );
 		} );
 
-		renderer->offline_render( camera ).dump( out.resolved() );
+		renderer->offline_render( cfg.camera ).dump( out.resolved() );
 	} else {
 		auto opts = GlfwRenderLoopOptions{}
 					  .set_resolution( cfg.render.resolution.x,
 									   cfg.render.resolution.y )
 					  .set_title( "hydrant" );
-		DebGlfwRenderLoop loop( opts );
+		DebGlfwRenderLoop loop( opts, cfg.camera );
 		loop.orbit = *cfg.camera.orbit;
 
 		renderer->render_loop( loop );

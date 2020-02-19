@@ -40,10 +40,18 @@ VM_EXPORT
 		VM_JSON_FIELD( vec3, arm );
 	};
 
+	struct CameraPerspective : vm::json::Serializable<CameraPerspective>
+	{
+		VM_JSON_FIELD( float, fovy ) = 60;
+	};
+
 	struct CameraConfig : vm::json::Serializable<CameraConfig>
 	{
 		VM_JSON_FIELD( std::shared_ptr<CameraPtu>, ptu ) = nullptr;
 		VM_JSON_FIELD( std::shared_ptr<CameraOrbit>, orbit ) = nullptr;
+		VM_JSON_FIELD( std::shared_ptr<CameraPerspective>, perspective ) =
+		  std::make_shared<CameraPerspective>( CameraPerspective{}
+												 .set_fovy( 60 ) );
 	};
 
 	struct Camera
@@ -52,45 +60,49 @@ VM_EXPORT
 		VM_DEFINE_ATTRIBUTE( vec3, target ) = { 0, 0, 0 };
 		VM_DEFINE_ATTRIBUTE( vec3, up ) = { 0, 1, 0 };
 
-		mat4 get_matrix() const { return lookAt( position, target, up ); }
+		VM_DEFINE_ATTRIBUTE( float, ctg_fovy_2 ) = INFINITY;
 
 	public:
-		static Camera from_config( CameraConfig const &cfg )
+		Camera() = default;
+
+		Camera( CameraConfig const &cfg )
 		{
 			if ( cfg.ptu ) {
-				return from_ptu( *cfg.ptu );
+				update_params( *cfg.ptu );
 			} else if ( cfg.orbit ) {
-				return from_orbit( *cfg.orbit );
+				update_params( *cfg.orbit );
+			} else {
+				throw std::logic_error( "invalid config" );
 			}
-			throw std::logic_error( "invalid config" );
+			if ( cfg.perspective ) {
+				ctg_fovy_2 = 1.f / tan( radians( cfg.perspective->fovy / 2.f ) );
+			}
 		}
-		static Camera from_ptu( CameraPtu const &ptu )
+
+	public:
+		mat4 get_matrix() const { return lookAt( position, target, up ); }
+
+		Camera &update_params( CameraPtu const &ptu )
 		{
-			Camera camera;
-			camera.position = ptu.position;
-			camera.target = ptu.target;
-			camera.up = ptu.up;
-			return camera;
+			position = ptu.position;
+			target = ptu.target;
+			up = ptu.up;
+			return *this;
 		}
-		static Camera from_orbit( CameraOrbit const &orbit )
+
+		Camera &update_params( CameraOrbit const &orbit )
 		{
-			Camera camera;
-			camera.target = orbit.center;
-			// mat4 m = { { 1, 0, 0, 0 },
-			// 		   { 0, 1, 0, 0 },
-			// 		   { 0, 0, 1, 0 },
-			// 		   { 0, 0, 0, 1 } };
-			// m = ;
-			// m = rotate( m, radians( orbit.arm.x ), vec3{ 0, 1, 0 } );
-			camera.position = rotate( mat4( 1 ),
-									  radians( orbit.arm.y ),
-									  vec3( 0, 0, 1 ) ) *
-							  vec4( orbit.arm.z, 0, 0, 1 );
-			camera.position = rotate( mat4( 1 ),
-									  radians( orbit.arm.x ),
-									  vec3( 0, 1, 0 ) ) *
-							  vec4( camera.position, 1 );
-			return camera;
+			target = orbit.center;
+			position = rotate( mat4( 1 ),
+							   radians( orbit.arm.y ),
+							   vec3( 0, 0, 1 ) ) *
+					   vec4( orbit.arm.z, 0, 0, 1 );
+			position = rotate( mat4( 1 ),
+							   radians( orbit.arm.x ),
+							   vec3( 0, 1, 0 ) ) *
+					   vec4( position, 1 );
+			up = vec3( 0, 1, 0 );
+			return *this;
 		}
 	};
 }
