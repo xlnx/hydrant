@@ -1,5 +1,6 @@
 #include <VMUtils/timer.hpp>
 #include <varch/thumbnail.hpp>
+#include <hydrant/double_buffering.hpp>
 #include "volume.hpp"
 
 using namespace std;
@@ -304,104 +305,57 @@ VM_EXPORT
 		// 				 .set_k( k )
 		// 				 .set_b( b );
 
-		auto film = create_film();
-		Image<cufx::StdByte4Pixel> frame( ImageOptions{}
-											.set_device( device )
-											.set_resolution( resolution ) );
 		// auto et = exhibit.get_matrix();
 		// auto pad_bs = uu->padded_block_size();
 		// auto block_bytes = pad_bs * pad_bs * pad_bs;
 
-		loop.post_loop();
+		auto film = create_film();
 
-		while ( !loop.should_stop() ) {
-			std::size_t ns = 0, ns1 = 0;
+		FnDoubleBuffering loop_drv(
+		  ImageOptions{}
+			.set_device( device )
+			.set_resolution( resolution ),
+		  loop,
+		  [&]( auto &frame ) {
+			  std::size_t ns = 0, ns1 = 0;
 
-			vm::Timer::Scoped timer( [&]( auto dt ) {
-				vm::println( "time: {} / {} / {}", dt.ms(),
-							 ns / 1000 / 1000,
-							 ns1 / 1000 / 1000 );
-			} );
+			  vm::Timer::Scoped timer( [&]( auto dt ) {
+				  vm::println( "time: {} / {} / {}", dt.ms(),
+							   ns / 1000 / 1000,
+							   ns1 / 1000 / 1000 );
+			  } );
 
-			loop.post_frame();
+			  int nbytes = 0, blkid = 0;
+			  memset( present_buf.data(), -1, present_buf.bytes() );
 
-			// glm::vec3 cp = et * glm::vec4( loop.camera.position, 1 );
+			  for ( auto &block : lowest_block_sampler_id ) {
+				  present_buf[ uvec3( block.first.x, block.first.y, block.first.z ) ] = block.second;
+			  }
 
-			// std::sort( pidx.begin(), pidx.end(),
-			// 		   [&]( int x, int y ) {
-			// 			   return glm::distance( block_ccs[ x ], cp ) <
-			// 					  glm::distance( block_ccs[ y ], cp );
-			// 		   } );
+			  present.source( present_buf.data(), false );
+			  shader.present = present.sampler();
 
-			// for ( int i = 0; i < pidx.size(); i += MAX_SAMPLER_COUNT ) {
-			// 	vector<Idx> idxs;
-			// 	for ( int j = i; j < i + MAX_SAMPLER_COUNT && j < pidx.size(); ++j ) {
-			// 		idxs.emplace_back( block_idxs[ pidx[ j ] ] );
-			// 	}
+			  {
+				  vm::Timer::Scoped timer( [&]( auto dt ) {
+					  ns1 += dt.ns().cnt();
+				  } );
 
-			int nbytes = 0, blkid = 0;
-			memset( present_buf.data(), -1, present_buf.bytes() );
+				  auto opts = RaycastingOptions{}.set_device( device );
 
-			for ( auto &block : lowest_block_sampler_id ) {
-				present_buf[ uvec3( block.first.x, block.first.y, block.first.z ) ] = block.second;
-			}
+				  raycaster.cast( exhibit,
+								  loop.camera,
+								  film.view(),
+								  shader,
+								  opts );
 
-			// {
-			// 	vm::Timer::Scoped timer( [&]( auto dt ) {
-			// 		ns += dt.ns().cnt();
-			// 	} );
+				  raycaster.cast( film.view(),
+								  frame.view(),
+								  shader,
+								  opts );
+			  }
+		  } );
 
-			// 	uu->unarchive(
-			// 	  idxs,
-			// 	  [&]( Idx const &idx, VoxelStreamPacket const &pkt ) {
-			// 		  pkt.append_to( buf->view_1d() );
-			// 		  nbytes += pkt.length;
-			// 		  if ( nbytes >= block_bytes ) {
-			// 			  auto fut = cache[ blkid ].source( buf->view_3d() );
-			// 			  fut.wait();
-			// 			  present_buf[ glm::vec3( idx.x, idx.y, idx.z ) ] = blkid;
-			// 			  nbytes = 0;
-			// 			  blkid += 1;
-			// 			  //   }
-			// 		  }
-			// 	  } );
-			// }
-
-			present.source( present_buf.data(), false );
-			shader.present = present.sampler();
-
-			// vm::println( "{}", cache_texs.size() );
-			// for ( int j = 0; j != cache.size(); ++j ) {
-			// 	shader.block_sampler[ j ] = BlockSampler{}
-			// 								  .set_sampler( cache[ j ].sampler() )
-			// 								  .set_mapping( mapping );
-			// }
-
-			{
-				vm::Timer::Scoped timer( [&]( auto dt ) {
-					ns1 += dt.ns().cnt();
-				} );
-
-				auto opts = RaycastingOptions{}.set_device( device );
-
-				raycaster.cast( exhibit,
-								loop.camera,
-								film.view(),
-								shader,
-								opts );
-
-				raycaster.cast( film.view(),
-								frame.view(),
-								shader,
-								opts );
-			}
-			// }
-
-			auto fp = frame.fetch_data();
-			loop.on_frame( fp );
-		}
-
-		loop.after_loop();
+		loop_drv.run();
 	}
 
 	REGISTER_RENDERER( VolumeRenderer, "Volume" );
