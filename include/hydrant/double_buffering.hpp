@@ -1,12 +1,11 @@
 #pragma once
 
 #include <array>
-#include <hydrant/core/render_loop.hpp>
-#include <hydrant/bridge/image.hpp>
-
 #include <thread>
 #include <mutex>
 #include <condition_variable>
+#include <hydrant/core/render_loop.hpp>
+#include <hydrant/bridge/image.hpp>
 
 VM_BEGIN_MODULE( hydrant )
 
@@ -40,7 +39,8 @@ VM_EXPORT
 						   FnType const &render_fn,
 						   FnType const &display_fn ) :
 		  IDoubleBuffering( opts, loop ),
-		  render_fn( render_fn )
+		  render_fn( render_fn ),
+		  display_fn( display_fn )
 		{
 		}
 
