@@ -8,13 +8,11 @@ VM_EXPORT
 {
 	struct StdVec4Pixel : IPixel
 	{
-		void write_to( unsigned char dst[ 4 ] )
+		__host__ __device__ void
+		  write_to( uchar4 &dst ) const
 		{
-			auto d = saturate( this->v );
-			dst[ 0 ] = d.x;
-			dst[ 1 ] = d.y;
-			dst[ 2 ] = d.z;
-			dst[ 3 ] = 255;
+			reinterpret_cast<tvec4<unsigned char> &>( dst ) = saturate( this->v );
+			dst.w = 255;
 		}
 
 	public:

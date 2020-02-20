@@ -8,19 +8,6 @@
 
 VM_BEGIN_MODULE( hydrant )
 
-struct PTU : vm::json::Serializable<PTU>
-{
-	VM_JSON_FIELD( vec3, position );
-	VM_JSON_FIELD( vec3, target ) = { 0, 0, 0 };
-	VM_JSON_FIELD( vec3, up ) = { 0, 1, 0 };
-};
-
-struct Orbit : vm::json::Serializable<Orbit>
-{
-	VM_JSON_FIELD( vec3, center ) = { 0, 0, 0 };
-	VM_JSON_FIELD( vec3, arm );
-};
-
 VM_EXPORT
 {
 	struct Exhibit : vm::Dynamic
@@ -40,10 +27,23 @@ VM_EXPORT
 		}
 	};
 
+	struct CameraPtu : vm::json::Serializable<CameraPtu>
+	{
+		VM_JSON_FIELD( vec3, position );
+		VM_JSON_FIELD( vec3, target ) = { 0, 0, 0 };
+		VM_JSON_FIELD( vec3, up ) = { 0, 1, 0 };
+	};
+
+	struct CameraOrbit : vm::json::Serializable<CameraOrbit>
+	{
+		VM_JSON_FIELD( vec3, center ) = { 0, 0, 0 };
+		VM_JSON_FIELD( vec3, arm );
+	};
+
 	struct CameraConfig : vm::json::Serializable<CameraConfig>
 	{
-		VM_JSON_FIELD( std::shared_ptr<PTU>, ptu ) = nullptr;
-		VM_JSON_FIELD( std::shared_ptr<Orbit>, orbit ) = nullptr;
+		VM_JSON_FIELD( std::shared_ptr<CameraPtu>, ptu ) = nullptr;
+		VM_JSON_FIELD( std::shared_ptr<CameraOrbit>, orbit ) = nullptr;
 	};
 
 	struct Camera
@@ -57,21 +57,39 @@ VM_EXPORT
 	public:
 		static Camera from_config( CameraConfig const &cfg )
 		{
-			Camera camera;
 			if ( cfg.ptu ) {
-				camera.position = cfg.ptu->position;
-				camera.target = cfg.ptu->target;
-				camera.up = cfg.ptu->up;
+				return from_ptu( *cfg.ptu );
 			} else if ( cfg.orbit ) {
-				camera.target = cfg.orbit->center;
-				mat4 m = { { 1, 0, 0, 0 },
-						   { 0, 1, 0, 0 },
-						   { 0, 0, 1, 0 },
-						   { 0, 0, 0, 1 } };
-				m = rotate( m, radians( cfg.orbit->arm.y ), vec3{ 0, 0, 1 } );
-				m = rotate( m, radians( cfg.orbit->arm.x ), vec3{ 0, 1, 0 } );
-				camera.position = m * vec4{ cfg.orbit->arm.z, 0, 0, 1 };
+				return from_orbit( *cfg.orbit );
 			}
+			throw std::logic_error( "invalid config" );
+		}
+		static Camera from_ptu( CameraPtu const &ptu )
+		{
+			Camera camera;
+			camera.position = ptu.position;
+			camera.target = ptu.target;
+			camera.up = ptu.up;
+			return camera;
+		}
+		static Camera from_orbit( CameraOrbit const &orbit )
+		{
+			Camera camera;
+			camera.target = orbit.center;
+			// mat4 m = { { 1, 0, 0, 0 },
+			// 		   { 0, 1, 0, 0 },
+			// 		   { 0, 0, 1, 0 },
+			// 		   { 0, 0, 0, 1 } };
+			// m = ;
+			// m = rotate( m, radians( orbit.arm.x ), vec3{ 0, 1, 0 } );
+			camera.position = rotate( mat4( 1 ),
+									  radians( orbit.arm.y ),
+									  vec3( 0, 0, 1 ) ) *
+							  vec4( orbit.arm.z, 0, 0, 1 );
+			camera.position = rotate( mat4( 1 ),
+									  radians( orbit.arm.x ),
+									  vec3( 0, 1, 0 ) ) *
+							  vec4( camera.position, 1 );
 			return camera;
 		}
 	};

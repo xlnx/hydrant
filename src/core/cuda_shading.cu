@@ -12,7 +12,7 @@ void DeviceFunctionDesc::copy_to_buffer( const void *udata, std::size_t size ) c
 /* Ray Emit Kernel Impl */
 
 __global__ void
-  ray_emit_kernel_impl( CudaRayEmitShadingKernelArgs args )
+  ray_emit_kernel_impl( CudaRayEmitKernelArgs args )
 {
 	uint x = blockIdx.x * blockDim.x + threadIdx.x;
 	uint y = blockIdx.y * blockDim.y + threadIdx.y;
@@ -36,10 +36,29 @@ __global__ void
 
 CUFX_DEFINE_KERNEL( ray_emit_kernel, ray_emit_kernel_impl );
 
+/* Ray March Kernel Impl */
+
+__global__ void
+  ray_march_kernel_impl( CudaRayMarchKernelArgs args )
+{
+	uint x = blockIdx.x * blockDim.x + threadIdx.x;
+	uint y = blockIdx.y * blockDim.y + threadIdx.y;
+
+	if ( x >= args.image_desc.resolution.x || y >= args.image_desc.resolution.y ) {
+		return;
+	}
+
+	auto shader = (ray_march_shader_t *)args.function_desc.fp;
+	shader( args.image_desc.data + args.image_desc.pixel_size * ( args.image_desc.resolution.x * y + x ),
+			shader_args_buffer + args.function_desc.offset );
+}
+
+CUFX_DEFINE_KERNEL( ray_march_kernel, ray_march_kernel_impl );
+
 /* Pixel Kernel Impl */
 
 __global__ void
-  pixel_kernel_impl( CudaPixelShadingKernelArgs args )
+  pixel_kernel_impl( CudaPixelKernelArgs args )
 {
 	uint x = blockIdx.x * blockDim.x + threadIdx.x;
 	uint y = blockIdx.y * blockDim.y + threadIdx.y;
@@ -50,7 +69,7 @@ __global__ void
 
 	auto shader = (pixel_shader_t *)args.function_desc.fp;
 	shader( args.image_desc.data + args.image_desc.pixel_size * ( args.image_desc.resolution.x * y + x ),
-			shader_args_buffer + args.function_desc.offset );
+			args.dst_desc.data + args.dst_desc.pixel_size * ( args.dst_desc.resolution.x * y + x ) );
 }
 
 CUFX_DEFINE_KERNEL( pixel_kernel, pixel_kernel_impl );

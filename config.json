@@ -2,8 +2,8 @@
     "camera": {
         "orbit": {
             "arm": [
-                25,
-                65,
+                0,
+                0,
                 2.2
             ]
         }
@@ -16,7 +16,8 @@
         "renderer": "Volume",
         "params": {
             "mode": "Volume",
-            "density": 1e-2,
+            "density": 1e-1,
+            "max_steps": 500,
             "transfer_fn": {
                 "values": [
                     [
