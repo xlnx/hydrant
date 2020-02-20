@@ -13,7 +13,7 @@ struct BoundingBox
 	vec3 min, max;
 };
 
-struct Frustrum
+struct Frustum
 {
 	bool contains( vec3 const &p ) const
 	{
@@ -152,7 +152,7 @@ VM_EXPORT
 		// 				  idx.x ];
 		// }
 
-		Frustrum get_frustrum( Camera const &camera,
+		Frustum get_frustrum( Camera const &camera,
 							   ScreenRect const &rect,
 							   mat4 const &trans ) const
 		{
@@ -163,7 +163,7 @@ VM_EXPORT
 				{ rect.min.x, rect.max.y, -camera.ctg_fovy_2 },
 			};
 
-			Frustrum frust;
+			Frustum frust;
 			frust.orig = vec3( 0 );
 			frust.norm[ 0 ] = cross( border[ 0 ], border[ 1 ] );
 			frust.norm[ 1 ] = cross( border[ 1 ], border[ 2 ] );
