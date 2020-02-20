@@ -52,8 +52,8 @@ VM_EXPORT
 
 		ThumbnailTexture<int> chebyshev;
 
-		Texture3D<int> present;
-		HostBuffer3D<int> present_buf;
+		Texture3D<int> vaddr;
+		HostBuffer3D<int> vaddr_buf;
 
 		std::vector<vol::Idx> block_idxs;
 		std::vector<glm::vec3> block_ccs;

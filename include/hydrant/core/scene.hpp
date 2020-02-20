@@ -15,7 +15,7 @@ VM_EXPORT
 		VM_DEFINE_ATTRIBUTE( vec3, size );
 		VM_DEFINE_ATTRIBUTE( vec3, center );
 
-		mat4 get_matrix() const
+		mat4 get_iet() const
 		{
 			auto d = max( abs( center - size ), abs( center ) );
 			float scale = glm::compMax( d );
@@ -65,45 +65,14 @@ VM_EXPORT
 	public:
 		Camera() = default;
 
-		Camera( CameraConfig const &cfg )
-		{
-			if ( cfg.ptu ) {
-				update_params( *cfg.ptu );
-			} else if ( cfg.orbit ) {
-				update_params( *cfg.orbit );
-			} else {
-				throw std::logic_error( "invalid config" );
-			}
-			if ( cfg.perspective ) {
-				ctg_fovy_2 = 1.f / tan( radians( cfg.perspective->fovy / 2.f ) );
-			}
-		}
+		Camera( CameraConfig const &cfg );
 
 	public:
-		mat4 get_matrix() const { return lookAt( position, target, up ); }
+		mat4 get_ivt() const { return inverse( lookAt( position, target, up ) ); }
 
-		Camera &update_params( CameraPtu const &ptu )
-		{
-			position = ptu.position;
-			target = ptu.target;
-			up = ptu.up;
-			return *this;
-		}
+		Camera &update_params( CameraPtu const &ptu );
 
-		Camera &update_params( CameraOrbit const &orbit )
-		{
-			target = orbit.center;
-			position = rotate( mat4( 1 ),
-							   radians( orbit.arm.y ),
-							   vec3( 0, 0, 1 ) ) *
-					   vec4( orbit.arm.z, 0, 0, 1 );
-			position = rotate( mat4( 1 ),
-							   radians( orbit.arm.x ),
-							   vec3( 0, 1, 0 ) ) *
-					   vec4( position, 1 );
-			up = vec3( 0, 1, 0 );
-			return *this;
-		}
+		Camera &update_params( CameraOrbit const &orbit );
 	};
 }
 

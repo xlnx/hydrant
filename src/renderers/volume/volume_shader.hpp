@@ -41,7 +41,7 @@ VM_EXPORT
 		float density;
 		Sampler transfer_fn;
 		Sampler chebyshev;
-		Sampler present;
+		Sampler vaddr;
 		BlockSampler const *block_sampler;
 	};
 }

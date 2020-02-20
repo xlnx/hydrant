@@ -1,7 +1,9 @@
 #include <varch/utils/io.hpp>
+#include <VMUtils/timer.hpp>
 #include <varch/unarchive/unarchiver.hpp>
 #include <hydrant/basic_renderer.hpp>
 #include <hydrant/core/render_loop.hpp>
+#include <hydrant/octree_culler.hpp>
 #include "blocks.hpp"
 
 using namespace std;
@@ -45,6 +47,28 @@ VM_EXPORT
 						RaycastingOptions{}
 						  .set_device( device ) );
 		return film.fetch_data().dump();
+	}
+
+	void BlocksRenderer::render_loop( IRenderLoop & loop )
+	{
+		loop.post_loop();
+		while ( !loop.should_stop() ) {
+			loop.post_frame();
+			OctreeCuller culler( exhibit, dim );
+			{
+				vm::Timer::Scoped tt( []( auto dt ) {
+					vm::println( "{}", dt.ms() );
+				} );
+				auto idxs = culler.cull( loop.camera );
+				static int rnd = 0;
+				if ( !( rnd = ( rnd + 1 ) % 60 ) ) {
+					vm::println( "{}", idxs );
+				}
+			}
+			auto frame = offline_render( loop.camera );
+			loop.on_frame( frame );
+		}
+		loop.after_loop();
 	}
 
 	REGISTER_RENDERER( BlocksRenderer, "Blocks" );
