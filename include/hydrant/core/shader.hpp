@@ -52,7 +52,7 @@ enum ShadingPass
 struct ViewArgs
 {
 	mat4 trans;
-	float itg_fovy;
+	float ctg_fovy_2;
 	vec3 ray_o;
 };
 

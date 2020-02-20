@@ -11,6 +11,12 @@ VM_EXPORT
 {
 	struct IRenderLoop : vm::NoCopy, vm::NoMove, vm::Dynamic
 	{
+		IRenderLoop( Camera const &camera ) :
+		  camera( camera )
+		{
+		}
+
+	public:
 		virtual void post_loop() {}
 
 		virtual bool should_stop() = 0;

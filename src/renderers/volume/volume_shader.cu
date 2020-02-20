@@ -30,9 +30,9 @@ struct VolumeShaderKernel : VolumeShader
 			if ( int cd = chebyshev.sample_3d<int>( ip ) ) {
 				nsteps -= skip_nblock_steps( ray, ip, cd, cdu, step );
 			} else {
-				auto present_id = present.sample_3d<int>( ip );
-				if ( present_id != -1 ) {
-					auto spl = block_sampler[ present_id ].sample_3d<float>( ray.o - ip );
+				auto pgid = vaddr.sample_3d<int>( ip );
+				if ( pgid != -1 ) {
+					auto spl = block_sampler[ pgid ].sample_3d<float>( ray.o - ip );
 					auto val = transfer_fn.sample_1d<vec4>( spl );
 					auto col = val * density;
 					pixel.v += col * ( 1.f - pixel.v.w );
