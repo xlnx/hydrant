@@ -12,3 +12,5 @@ vm_target_dependency(hydrant cppfs PUBLIC)
 vm_target_dependency(hydrant glm-cuda PUBLIC)
 
 target_link_libraries(hydrant glfw)
+target_link_libraries(hydrant dl)
+

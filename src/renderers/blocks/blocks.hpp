@@ -22,6 +22,8 @@ VM_EXPORT
 
 		cufx::Image<> offline_render( Camera const &camera ) override;
 
+		void render_loop( IRenderLoop &loop ) override;
+
 	private:
 		ThumbnailTexture<int> chebyshev;
 		ThumbnailTexture<float> mean;

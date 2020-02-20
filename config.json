@@ -6,7 +6,10 @@
                 0,
                 2.2
             ]
-        }
+        },
+		"perspective": {
+			"fovy": 60
+		}
     },
     "render": {
         "resolution": [
