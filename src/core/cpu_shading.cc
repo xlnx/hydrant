@@ -19,7 +19,7 @@ void ray_emit_task_dispatch( ThreadPoolInfo const &thread_pool_info,
 			  for ( int y = y0; y < args.image_desc.resolution.y; y += thread_pool_info.nthreads ) {
 				  for ( int x = 0; x < args.image_desc.resolution.x; ++x ) {
 					  auto uv = ( vec2{ x, y } - cc ) * 2.f / float( args.image_desc.resolution.y );
-					  ray.d = normalize( vec3( args.view.trans * vec4( uv.x, -uv.y, -args.view.itg_fovy, 1 ) ) - args.view.ray_o );
+					  ray.d = normalize( vec3( args.view.trans * vec4( uv.x, -uv.y, -args.view.ctg_fovy_2, 1 ) ) - args.view.ray_o );
 					  launcher( ray,
 								args.image_desc.data + args.image_desc.pixel_size * ( args.image_desc.resolution.x * y + x ),
 								args.shader );

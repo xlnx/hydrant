@@ -25,7 +25,7 @@ __global__ void
 	auto uv = ( vec2{ x, y } - cc ) * 2.f / float( args.image_desc.resolution.y );
 	Ray ray = {
 		args.view.ray_o,
-		normalize( vec3( args.view.trans * vec4( uv.x, -uv.y, -args.view.itg_fovy, 1 ) ) - args.view.ray_o )
+		normalize( vec3( args.view.trans * vec4( uv.x, -uv.y, -args.view.ctg_fovy_2, 1 ) ) - args.view.ray_o )
 	};
 
 	auto shader = (ray_emit_shader_t *)args.function_desc.fp;
