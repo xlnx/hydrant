@@ -66,7 +66,6 @@ struct DebGlfwRenderLoop : GlfwRenderLoop
 			orbit.arm.x += -( x1 - x0 ) / resolution.x * 90;
 			orbit.arm.y += ( y1 - y0 ) / resolution.y * 90;
 			orbit.arm.y = glm::clamp( orbit.arm.y, -90.f, 90.f );
-			vm::println( "{}", orbit.arm );
 		}
 		x0 = x1;
 		y0 = y1;

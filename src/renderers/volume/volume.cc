@@ -10,8 +10,8 @@
 using namespace std;
 using namespace vol;
 
-#define MAX_SAMPLER_COUNT ( 1024 )
-#define MAX_BLOCK_COUNT ( 8 )
+#define MAX_SAMPLER_COUNT ( 256 )
+#define MAX_BLOCK_COUNT ( 16 )
 
 VM_BEGIN_MODULE( hydrant )
 
@@ -294,18 +294,17 @@ VM_EXPORT
 		if ( device.has_value() ) {
 			device_registry.reset( new cufx::GlobalMemory( MAX_SAMPLER_COUNT * sizeof( BlockSampler ),
 														   device.value() ) );
-			device_reg_view = device_registry->view_1d<BlockSampler>( rest_blkcnt,
-																	  lowest_blkcnt * sizeof( Sampler ) );
+			device_reg_view = device_registry->view_1d<BlockSampler>( MAX_SAMPLER_COUNT )
+				.slice( lowest_blkcnt, rest_blkcnt );
 			cufx::memory_transfer( device_registry->view_1d<BlockSampler>( lowest_blkcnt ),
 								   cufx::MemoryView1D<BlockSampler>( host_registry.data(), lowest_blkcnt ) )
 			  .launch();
 			shader.block_sampler = reinterpret_cast<BlockSampler const *>( device_registry->get() );
 		}
 
-		auto update_device_registry_if = [&]( int storage_id ) {
+		auto update_device_registry_if = [&]() {
 			if ( device.has_value() ) {
-				cufx::memory_transfer( device_reg_view.slice( storage_id, 1 ),
-									   host_reg_view.slice( storage_id, 1 ) )
+				cufx::memory_transfer( device_reg_view, host_reg_view )
 				  .launch();
 			}
 		};
@@ -365,7 +364,8 @@ VM_EXPORT
 				  /* reset that block to lowest sample level */
 				  swap_vaddr = basic_vaddr_buf[ uvec3_idx ];
 			  } else {
-				  throw std::logic_error( vm::fmt( "block {} overflow", idx ) );
+				  vm::println("block {} abandoned", idx);
+				  return ;
 			  }
 
 			  auto storage_id = vaddr_id - lowest_blkcnt;
@@ -377,7 +377,7 @@ VM_EXPORT
 			  host_reg_view.at( storage_id ) = BlockSampler{}
 												 .set_sampler( storage.sampler() )
 												 .set_mapping( mapping );
-			  update_device_registry_if( storage_id );
+			  //			  update_device_registry_if( storage_id );
 
 			  vaddr_buf[ uvec3( idx.x, idx.y, idx.z ) ] = vaddr_id;
 			  present_idxs.insert( idx );
@@ -426,10 +426,14 @@ VM_EXPORT
 				  // 	  present_idxs.insert( idx );
 				  //   }
 
-				  pipeline.lock().require( missing_idxs.begin(),
-										   missing_idxs.end(),
-										   []( auto &idx ) { return 1.f; } );
+				  if (missing_idxs.size()) {
+					  pipeline.lock().require( missing_idxs.begin(),
+											   missing_idxs.end(),
+											   []( auto &idx ) { return 1.f; } );
+				  }
 			  }
+
+			  update_device_registry_if();
 
 			  vaddr.source( vaddr_buf.data(), false );
 			  shader.vaddr = vaddr.sampler();
