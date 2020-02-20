@@ -36,19 +36,19 @@ VM_EXPORT
 				   RaycastingOptions const &opts )
 		{
 			if ( opts.device.has_value() ) {
-				CudaRayEmitShadingKernelArgs kernel_args;
+				CudaRayEmitKernelArgs kernel_args;
 				kernel_args.shading_pass = ShadingPass::RayEmit;
 				kernel_args.image_desc.create_from_img( img, true );
 				fill_ray_emit_args( kernel_args, e, c );
 
-				return cast_cuda_impl( &kernel_args, img, f, opts );
+				return cast_cuda_impl( &kernel_args, f, opts );
 			} else {
-				CpuRayEmitShadingKernelArgs kernel_args;
+				CpuRayEmitKernelArgs kernel_args;
 				kernel_args.shading_pass = ShadingPass::RayEmit;
 				kernel_args.image_desc.create_from_img( img, false );
 				fill_ray_emit_args( kernel_args, e, c );
 
-				return cast_cpu_impl( &kernel_args, img, f, opts );
+				return cast_cpu_impl( &kernel_args, f, opts );
 			}
 		}
 
@@ -58,22 +58,45 @@ VM_EXPORT
 				   RaycastingOptions const &opts )
 		{
 			if ( opts.device.has_value() ) {
-				CudaPixelShadingKernelArgs kernel_args;
-				kernel_args.shading_pass = ShadingPass::Pixel;
+				CudaRayMarchKernelArgs kernel_args;
+				kernel_args.shading_pass = ShadingPass::RayMarch;
 				kernel_args.image_desc.create_from_img( img, true );
 
-				return cast_cuda_impl( &kernel_args, img, f, opts );
+				return cast_cuda_impl( &kernel_args, f, opts );
 			} else {
-				CpuPixelShadingKernelArgs kernel_args;
-				kernel_args.shading_pass = ShadingPass::Pixel;
+				CpuRayMarchKernelArgs kernel_args;
+				kernel_args.shading_pass = ShadingPass::RayMarch;
 				kernel_args.image_desc.create_from_img( img, false );
 
-				return cast_cpu_impl( &kernel_args, img, f, opts );
+				return cast_cpu_impl( &kernel_args, f, opts );
+			}
+		}
+
+		template <typename P, typename F>
+		void cast( cufx::ImageView<P> &img,
+				   cufx::ImageView<cufx::StdByte4Pixel> &dst,
+				   F const &f,
+				   RaycastingOptions const &opts )
+		{
+			if ( opts.device.has_value() ) {
+				CudaPixelKernelArgs kernel_args;
+				kernel_args.shading_pass = ShadingPass::Pixel;
+				kernel_args.image_desc.create_from_img( img, true );
+				kernel_args.dst_desc.create_from_img( dst, true );
+
+				return cast_cuda_impl( &kernel_args, f, opts );
+			} else {
+				CpuPixelKernelArgs kernel_args;
+				kernel_args.shading_pass = ShadingPass::Pixel;
+				kernel_args.image_desc.create_from_img( img, false );
+				kernel_args.dst_desc.create_from_img( dst, false );
+
+				return cast_cpu_impl( &kernel_args, f, opts );
 			}
 		}
 
 	private:
-		void fill_ray_emit_args( BasicRayEmitShadingKernelArgs &args,
+		void fill_ray_emit_args( BasicRayEmitKernelArgs &args,
 								 Exhibit const &e,
 								 Camera const &c ) const
 		{
@@ -100,9 +123,8 @@ VM_EXPORT
 			return cuda_shader_kernel->second;
 		}
 
-		template <typename P, typename F>
-		void cast_cuda_impl( BasicShadingKernelArgs *kernel_args,
-							 cufx::ImageView<P> &img,
+		template <typename F>
+		void cast_cuda_impl( BasicKernelArgs *kernel_args,
 							 F const &f,
 							 RaycastingOptions const &opts )
 		{
@@ -123,9 +145,8 @@ VM_EXPORT
 			device( reinterpret_cast<void *>( &args ) );
 		}
 
-		template <typename P, typename F>
-		void cast_cpu_impl( BasicShadingKernelArgs *kernel_args,
-							cufx::ImageView<P> &img,
+		template <typename F>
+		void cast_cpu_impl( BasicKernelArgs *kernel_args,
 							F const &f,
 							RaycastingOptions const &opts )
 		{

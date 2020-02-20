@@ -5,23 +5,44 @@
 #include <hydrant/bridge/sampler.hpp>
 #include <hydrant/pixel_template.hpp>
 
-#define MAX_CACHE_SIZE ( 64 )
-
 VM_BEGIN_MODULE( hydrant )
 
 VM_EXPORT
 {
+	struct BlockSamplerMapping
+	{
+		__host__ __device__ vec3
+		  mapped( vec3 const &x ) const
+		{
+			return k * x + b;
+		}
+
+	public:
+		VM_DEFINE_ATTRIBUTE( float, k );
+		VM_DEFINE_ATTRIBUTE( vec3, b );
+	};
+
+	struct BlockSampler
+	{
+		template <typename T>
+		__host__ __device__ T
+		  sample_3d( vec3 const &x ) const
+		{
+			return sampler.sample_3d<T>( mapping.mapped( x ) );
+		}
+
+	public:
+		VM_DEFINE_ATTRIBUTE( Sampler, sampler );
+		VM_DEFINE_ATTRIBUTE( BlockSamplerMapping, mapping );
+	};
+
 	struct VolumeShader : IShader<StdVec4Pixel>
 	{
-		cufx::MemoryView1D<char> absent_buf;
-		int wg_max_emit_cnt;
-		int wg_len_bytes;
-
-		vec2 cache_du;
+		float density;
 		Sampler transfer_fn;
 		Sampler chebyshev;
 		Sampler present;
-		Sampler cache_tex[ MAX_CACHE_SIZE ];
+		BlockSampler const *block_sampler;
 	};
 }
 

@@ -7,6 +7,7 @@
 #include <varch/package_meta.hpp>
 #include <hydrant/core/glm_math.hpp>
 #include <hydrant/core/raycaster.hpp>
+#include <hydrant/core/render_loop.hpp>
 
 VM_BEGIN_MODULE( hydrant )
 
@@ -30,11 +31,22 @@ VM_EXPORT
 		virtual bool init( std::shared_ptr<Dataset> const &dataset, RendererConfig const &cfg )
 		{
 			this->dataset = dataset;
-			this->resolution = resolution;
+			this->resolution = cfg.resolution;
 			return true;
 		}
 
-		virtual void offline_render( std::string const &dst_path, Camera const &camera ) = 0;
+		virtual cufx::Image<> offline_render( Camera const &camera ) = 0;
+
+		virtual void render_loop( IRenderLoop &loop )
+		{
+			loop.post_loop();
+			while ( !loop.should_stop() ) {
+				loop.post_frame();
+				auto frame = offline_render( loop.camera );
+				loop.on_frame( frame );
+			}
+			loop.after_loop();
+		}
 
 	protected:
 		std::shared_ptr<Dataset> dataset;
