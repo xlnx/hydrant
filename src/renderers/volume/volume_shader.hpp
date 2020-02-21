@@ -1,5 +1,6 @@
 #pragma once
 
+#include <VMUtils/enum.hpp>
 #include <hydrant/core/glm_math.hpp>
 #include <hydrant/core/shader.hpp>
 #include <hydrant/bridge/sampler.hpp>
@@ -36,12 +37,17 @@ VM_EXPORT
 		VM_DEFINE_ATTRIBUTE( BlockSamplerMapping, mapping );
 	};
 
+	VM_ENUM( VolumeRenderMode,
+			 Volume, DebCache );
+		
 	struct VolumeShader : IShader<StdVec4Pixel>
 	{
+		VolumeRenderMode mode;
 		float density;
 		Sampler transfer_fn;
 		Sampler chebyshev;
 		Sampler vaddr;
+		int lowest_blkcnt;
 		BlockSampler const *block_sampler;
 	};
 }

@@ -32,10 +32,24 @@ struct VolumeShaderKernel : VolumeShader
 			} else {
 				auto pgid = vaddr.sample_3d<int>( ip );
 				if ( pgid != -1 ) {
-					auto spl = block_sampler[ pgid ].sample_3d<float>( ray.o - ip );
-					auto val = transfer_fn.sample_1d<vec4>( spl );
-					auto col = val * density;
-					pixel.v += col * ( 1.f - pixel.v.w );
+				    switch ( mode._to_integral() ) {
+					case VolumeRenderMode::Volume: {
+						auto spl = block_sampler[ pgid ].sample_3d<float>( ray.o - ip );
+						auto val = transfer_fn.sample_1d<vec4>( spl );
+						auto col = val * density;
+						pixel.v += col * ( 1.f - pixel.v.w );
+					} break;
+					case VolumeRenderMode::DebCache: {
+						vec4 col;
+				    	if ( pgid >= lowest_blkcnt ) {
+					   	    col = vec4( 0, 1, 0, 1 ) * .5f;
+						} else {
+					   	    col = vec4( 1, 0, 0, 1 ) * .2f;						
+						}
+						nsteps -= skip_nblock_steps( ray, ip, 1, cdu, step );
+						pixel.v += col * ( 1.f - pixel.v.w );
+					} break;
+					}
 					if ( pixel.v.w > opacity_threshold ) {
 						break;
 					}

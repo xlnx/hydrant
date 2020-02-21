@@ -11,7 +11,7 @@ using namespace std;
 using namespace vol;
 
 #define MAX_SAMPLER_COUNT ( 256 )
-#define MAX_BLOCK_COUNT ( 16 )
+#define MAX_BLOCK_COUNT ( 8 )
 
 VM_BEGIN_MODULE( hydrant )
 
@@ -33,6 +33,7 @@ VM_EXPORT
 		auto params = cfg.params.get<VolumeRendererConfig>();
 		// shader.render_mode = params.mode == "volume" ? BrmVolume : BrmSolid;
 		shader.density = params.density;
+		shader.mode = params.mode;
 		transfer_fn = TransferFn( params.transfer_fn, device );
 		shader.transfer_fn = transfer_fn.sampler();
 
@@ -276,6 +277,7 @@ VM_EXPORT
 		auto lowest_blocks = unarchive_lowest_level();
 		auto lowest_blkcnt = lowest_blocks.size();
 		auto rest_blkcnt = MAX_SAMPLER_COUNT - lowest_blkcnt;
+		shader.lowest_blkcnt = lowest_blkcnt;
 
 		vector<BlockSampler> host_registry( MAX_SAMPLER_COUNT );
 		cufx::MemoryView1D<BlockSampler> host_reg_view( host_registry.data() + lowest_blkcnt,
@@ -333,6 +335,7 @@ VM_EXPORT
 		auto k = float( lvl0_arch.block_size ) / ( lvl0_arch.block_size + 2 * lvl0_arch.padding );
 		auto b = vec3( float( lvl0_arch.padding ) / lvl0_arch.block_size * k );
 		auto mapping = BlockSamplerMapping{}.set_k( k ).set_b( b );
+		auto storage_opts = block_tex_opts( lvl0_arch.block_size + 2 * lvl0_arch.padding );
 
 		Unarchiver unarchiver( dataset->root.resolve( lvl0_arch.path ).resolved() );
 		FnUnarchivePipeline pipeline(
@@ -341,22 +344,15 @@ VM_EXPORT
 			  std::unique_lock<std::mutex> lk( idxs_mut );
 			  int vaddr_id = -1;
 			  if ( block_storage.size() < MAX_BLOCK_COUNT ) {
-				  auto opts = Texture3DOptions{}
-								.set_dim( unarchiver.padded_block_size() )
-								.set_device( device )
-								.set_opts( cufx::Texture::Options{}
-											 .set_address_mode( cufx::Texture::AddressMode::Wrap )
-											 .set_filter_mode( cufx::Texture::FilterMode::Linear )
-											 .set_read_mode( cufx::Texture::ReadMode::NormalizedFloat )
-											 .set_normalize_coords( true ) );
 				  /* skip those lowest blocks */
 				  auto storage_id = block_storage.size();
 				  vaddr_id = lowest_blkcnt + storage_id;
 				  vm::println( "allocate {}", storage_id );
-				  block_storage.emplace_back( opts );
+				  block_storage.emplace_back( storage_opts );
 			  } else if ( redundant_idxs.size() ) {
 				  auto swap_idx = redundant_idxs.back();
 				  redundant_idxs.pop_back();
+				  vm::println("swap +{} -{}", idx, swap_idx);
 				  present_idxs.erase( swap_idx );
 				  auto uvec3_idx = uvec3( swap_idx.x, swap_idx.y, swap_idx.z );
 				  auto &swap_vaddr = vaddr_buf[ uvec3_idx ];

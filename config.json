@@ -18,7 +18,7 @@
         ],
         "renderer": "Volume",
         "params": {
-            "mode": "Volume",
+            "mode": "DebCache",
             "density": 1e-1,
             "max_steps": 500,
             "transfer_fn": {
