@@ -11,7 +11,7 @@ using namespace std;
 using namespace vol;
 
 #define MAX_SAMPLER_COUNT ( 256 )
-#define MAX_BLOCK_COUNT ( 8 )
+#define MAX_BLOCK_COUNT ( 16 )
 
 VM_BEGIN_MODULE( hydrant )
 
@@ -37,11 +37,11 @@ VM_EXPORT
 		transfer_fn = TransferFn( params.transfer_fn, device );
 		shader.transfer_fn = transfer_fn.sampler();
 
-		auto &lvl0_arch = dataset->meta.sample_levels[ 0 ].archives[ 0 ];
-		uu.reset( new Unarchiver( dataset->root.resolve( lvl0_arch.path ).resolved() ) );
+		lvl0_arch = &dataset->meta.sample_levels[ 0 ].archives[ 0 ];
 
-		auto chebyshev_thumb = std::make_shared<vol::Thumbnail<int>>(
-		  dataset->root.resolve( lvl0_arch.thumbnails[ "chebyshev" ] ).resolved() );
+		chebyshev_thumb.reset(
+		  new vol::Thumbnail<int>(
+			dataset->root.resolve( lvl0_arch->thumbnails[ "chebyshev" ] ).resolved() ) );
 		chebyshev = create_texture( chebyshev_thumb );
 		shader.chebyshev = chebyshev.sampler();
 
@@ -52,20 +52,6 @@ VM_EXPORT
 			.set_dim( dim )
 			.set_opts( cufx::Texture::Options::as_array()
 						 .set_address_mode( cufx::Texture::AddressMode::Clamp ) ) );
-
-		chebyshev_thumb->iterate_3d(
-		  [&]( vol::Idx const &idx ) {
-			  if ( !( *chebyshev_thumb )[ idx ] ) {
-				  block_idxs.emplace_back( idx );
-			  }
-		  } );
-		vm::println( "{}", block_idxs );
-		block_ccs.resize( block_idxs.size() );
-		std::transform( block_idxs.begin(), block_idxs.end(), block_ccs.begin(),
-						[]( Idx const &idx ) { return glm::vec3( idx.x, idx.y, idx.z ) + 0.5f; } );
-		pidx.resize( block_idxs.size() );
-		for ( int i = 0; i != pidx.size(); ++i ) { pidx[ i ] = i; }
-		vm::println( "{}", block_idxs.size() );
 
 		return true;
 	}
@@ -206,7 +192,7 @@ VM_EXPORT
 		auto &arch = *sample_level( level );
 
 		auto nblk_x = ( 1 << level ) * arch.block_size;
-		auto nblk_y = dataset->meta.sample_levels[ 0 ].archives[ 0 ].block_size;
+		auto nblk_y = lvl0_arch->block_size;
 		if ( nblk_x % nblk_y != 0 ) {
 			throw std::logic_error( "nblk_x % nblk_y != 0" );
 		}
@@ -216,8 +202,11 @@ VM_EXPORT
 		auto buf = alloc_block_buf( pad_bs );
 		auto opts = block_tex_opts( pad_bs );
 
-		auto k = float( uu->block_size() ) / uu->padded_block_size() / nblk_scale;
-		auto b0 = vec3( float( uu->padding() ) / uu->padded_block_size() );
+		auto bs_0 = lvl0_arch->block_size;
+		auto pad_0 = lvl0_arch->padding;
+		auto pad_bs_0 = lvl0_arch->block_size + 2 * pad_0;
+		auto k = float( bs_0 ) / pad_bs_0 / nblk_scale;
+		auto b0 = vec3( float( pad_0 ) / pad_bs_0 );
 
 		vector<Idx> idxs;
 		idxs.reserve( arch.dim.total() );
@@ -297,7 +286,7 @@ VM_EXPORT
 			device_registry.reset( new cufx::GlobalMemory( MAX_SAMPLER_COUNT * sizeof( BlockSampler ),
 														   device.value() ) );
 			device_reg_view = device_registry->view_1d<BlockSampler>( MAX_SAMPLER_COUNT )
-				.slice( lowest_blkcnt, rest_blkcnt );
+								.slice( lowest_blkcnt, rest_blkcnt );
 			cufx::memory_transfer( device_registry->view_1d<BlockSampler>( lowest_blkcnt ),
 								   cufx::MemoryView1D<BlockSampler>( host_registry.data(), lowest_blkcnt ) )
 			  .launch();
@@ -323,7 +312,7 @@ VM_EXPORT
 
 		auto film = create_film();
 
-		OctreeCuller culler( exhibit, dim );
+		OctreeCuller culler( exhibit, chebyshev_thumb );
 		vector<Idx> missing_idxs( MAX_BLOCK_COUNT );
 		vector<Idx> redundant_idxs( MAX_BLOCK_COUNT );
 		set<Idx> present_idxs;
@@ -331,13 +320,15 @@ VM_EXPORT
 
 		vector<Texture3D<unsigned char>> block_storage;
 
-		auto &lvl0_arch = dataset->meta.sample_levels[ 0 ].archives[ 0 ];
-		auto k = float( lvl0_arch.block_size ) / ( lvl0_arch.block_size + 2 * lvl0_arch.padding );
-		auto b = vec3( float( lvl0_arch.padding ) / lvl0_arch.block_size * k );
+		auto bs = lvl0_arch->block_size;
+		auto pad = lvl0_arch->padding;
+		auto pad_bs = lvl0_arch->block_size + 2 * pad;
+		auto k = float( bs ) / pad_bs;
+		auto b = vec3( float( pad ) / bs * k );
 		auto mapping = BlockSamplerMapping{}.set_k( k ).set_b( b );
-		auto storage_opts = block_tex_opts( lvl0_arch.block_size + 2 * lvl0_arch.padding );
+		auto storage_opts = block_tex_opts( pad_bs );
 
-		Unarchiver unarchiver( dataset->root.resolve( lvl0_arch.path ).resolved() );
+		Unarchiver unarchiver( dataset->root.resolve( lvl0_arch->path ).resolved() );
 		FnUnarchivePipeline pipeline(
 		  unarchiver,
 		  [&]( auto &idx, auto &buffer ) {
@@ -352,7 +343,7 @@ VM_EXPORT
 			  } else if ( redundant_idxs.size() ) {
 				  auto swap_idx = redundant_idxs.back();
 				  redundant_idxs.pop_back();
-				  vm::println("swap +{} -{}", idx, swap_idx);
+				  vm::println( "swap +{} -{}", idx, swap_idx );
 				  present_idxs.erase( swap_idx );
 				  auto uvec3_idx = uvec3( swap_idx.x, swap_idx.y, swap_idx.z );
 				  auto &swap_vaddr = vaddr_buf[ uvec3_idx ];
@@ -360,8 +351,8 @@ VM_EXPORT
 				  /* reset that block to lowest sample level */
 				  swap_vaddr = basic_vaddr_buf[ uvec3_idx ];
 			  } else {
-				  vm::println("block {} abandoned", idx);
-				  return ;
+				  vm::println( "block {} abandoned", idx );
+				  return;
 			  }
 
 			  auto storage_id = vaddr_id - lowest_blkcnt;
@@ -422,7 +413,7 @@ VM_EXPORT
 				  // 	  present_idxs.insert( idx );
 				  //   }
 
-				  if (missing_idxs.size()) {
+				  if ( missing_idxs.size() ) {
 					  pipeline.lock().require( missing_idxs.begin(),
 											   missing_idxs.end(),
 											   []( auto &idx ) { return 1.f; } );

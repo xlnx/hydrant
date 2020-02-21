@@ -47,18 +47,14 @@ VM_EXPORT
 		std::vector<LowestLevelBlock> unarchive_lowest_level();
 
 	private:
-		std::shared_ptr<Unarchiver> uu;
-
 		TransferFn transfer_fn;
+		vol::MtArchive *lvl0_arch;
 
+		std::shared_ptr<vol::Thumbnail<int>> chebyshev_thumb;
 		ThumbnailTexture<int> chebyshev;
 
 		Texture3D<int> vaddr;
 		HostBuffer3D<int> vaddr_buf;
-
-		std::vector<vol::Idx> block_idxs;
-		std::vector<glm::vec3> block_ccs;
-		std::vector<int> pidx;
 	};
 }
 
