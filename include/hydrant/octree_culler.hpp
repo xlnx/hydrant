@@ -36,6 +36,7 @@ struct Frustum
 				}
 			}
 		}
+		return false;
 	}
 
 	bool contains( BoundingBox const &bbox, bool &strict ) const

@@ -1,7 +1,6 @@
 #pragma once
 
 #include <varch/utils/io.hpp>
-#include <hydrant/unarchiver.hpp>
 #include <hydrant/bridge/buffer3d.hpp>
 #include <hydrant/basic_renderer.hpp>
 #include <hydrant/transfer_fn.hpp>
@@ -31,30 +30,11 @@ VM_EXPORT
 		void render_loop( IRenderLoop &loop ) override;
 
 	private:
-		vol::MtArchive const *sample_level( std::size_t level ) const;
-
-		std::shared_ptr<IBuffer3D<unsigned char>> alloc_block_buf( std::size_t pad_bs );
-
-		Texture3DOptions block_tex_opts( std::size_t pad_bs ) const;
-
-		struct LowestLevelBlock
-		{
-			VM_DEFINE_ATTRIBUTE( vol::Idx, idx );
-			VM_DEFINE_ATTRIBUTE( Texture3D<unsigned char>, storage );
-			VM_DEFINE_ATTRIBUTE( BlockSampler, sampler );
-		};
-
-		std::vector<LowestLevelBlock> unarchive_lowest_level();
-
-	private:
 		TransferFn transfer_fn;
 		vol::MtArchive *lvl0_arch;
 
 		std::shared_ptr<vol::Thumbnail<int>> chebyshev_thumb;
 		ThumbnailTexture<int> chebyshev;
-
-		Texture3D<int> vaddr;
-		HostBuffer3D<int> vaddr_buf;
 	};
 }
 
