@@ -316,6 +316,8 @@ void RtBlockPagingServerImpl::update( OctreeCuller &culler, Camera const &camera
 		}
 	}
 
+	registry->update();
+
 	vaddr.source( vaddr_buf.data(), false );
 	client.vaddr = vaddr.sampler();
 }
