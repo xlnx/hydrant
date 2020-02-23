@@ -6,7 +6,7 @@
 #include <cudafx/transfer.hpp>
 #include <hydrant/core/glm_math.hpp>
 #include <hydrant/bridge/sampler.hpp>
-#include <hydrant/bridge/buffer3d.hpp>
+#include <hydrant/bridge/buffer_3d.hpp>
 
 VM_BEGIN_MODULE( hydrant )
 

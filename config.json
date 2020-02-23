@@ -2,9 +2,9 @@
     "camera": {
         "orbit": {
             "arm": [
-                0,
-                0,
-                2.2
+                30,
+                30,
+                3.2
             ]
         },
         "perspective": {
@@ -13,11 +13,12 @@
     },
     "render": {
         "resolution": [
-            512,
-            512
+            800,
+            800
         ],
-        "renderer": "Volume",
+        "renderer": "Isosurface",
         "params": {
+            "isovalue": 0.8,
             "mode": "DebCache",
             "density": 1e-1,
             "max_steps": 500,

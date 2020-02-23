@@ -1,6 +1,8 @@
+#include <set>
+#include <algorithm>
 #include <hydrant/rt_block_paging.hpp>
 #include <hydrant/bridge/texture_3d.hpp>
-#include <hydrant/bridge/buffer3d.hpp>
+#include <hydrant/bridge/buffer_3d.hpp>
 #include <hydrant/unarchiver.hpp>
 #include <hydrant/unarchive_pipeline.hpp>
 

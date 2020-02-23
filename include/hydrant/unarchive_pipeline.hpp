@@ -9,7 +9,7 @@
 #include <condition_variable>
 #include <VMUtils/option.hpp>
 #include <cudafx/device.hpp>
-#include <hydrant/bridge/buffer3d.hpp>
+#include <hydrant/bridge/buffer_3d.hpp>
 #include <hydrant/unarchiver.hpp>
 
 VM_BEGIN_MODULE( hydrant )

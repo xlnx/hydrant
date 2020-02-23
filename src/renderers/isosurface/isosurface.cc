@@ -2,7 +2,7 @@
 #include <varch/thumbnail.hpp>
 #include <hydrant/double_buffering.hpp>
 #include <hydrant/rt_block_paging.hpp>
-#include "volume.hpp"
+#include "isosurface.hpp"
 
 using namespace std;
 using namespace vol;
@@ -11,17 +11,13 @@ VM_BEGIN_MODULE( hydrant )
 
 VM_EXPORT
 {
-	bool VolumeRenderer::init( std::shared_ptr<Dataset> const &dataset,
-							   RendererConfig const &cfg )
+	bool IsosurfaceRenderer::init( std::shared_ptr<Dataset> const &dataset,
+								   RendererConfig const &cfg )
 	{
 		if ( !Super::init( dataset, cfg ) ) { return false; }
 
-		auto params = cfg.params.get<VolumeRendererConfig>();
-		// shader.render_mode = params.mode == "volume" ? BrmVolume : BrmSolid;
-		shader.density = params.density;
-		shader.mode = params.mode;
-		transfer_fn = TransferFn( params.transfer_fn, device );
-		shader.transfer_fn = transfer_fn.sampler();
+		auto params = cfg.params.get<IsosurfaceRendererConfig>();
+		shader.isovalue = params.isovalue;
 
 		lvl0_arch = &dataset->meta.sample_levels[ 0 ].archives[ 0 ];
 
@@ -34,7 +30,7 @@ VM_EXPORT
 		return true;
 	}
 
-	cufx::Image<> VolumeRenderer::offline_render( Camera const &camera )
+	cufx::Image<> IsosurfaceRenderer::offline_render( Camera const &camera )
 	{
 		auto film = create_film();
 
@@ -137,7 +133,7 @@ VM_EXPORT
 		return film.fetch_data().dump();
 	}
 
-	void VolumeRenderer::render_loop( IRenderLoop & loop )
+	void IsosurfaceRenderer::render_loop( IRenderLoop & loop )
 	{
 		auto film = create_film();
 
@@ -192,7 +188,7 @@ VM_EXPORT
 		srv.stop();
 	}
 
-	REGISTER_RENDERER( VolumeRenderer, "Volume" );
+	REGISTER_RENDERER( IsosurfaceRenderer, "Isosurface" );
 }
 
 VM_END_MODULE()
