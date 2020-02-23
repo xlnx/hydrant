@@ -4,7 +4,7 @@
             "arm": [
                 30,
                 30,
-                3.2
+                2.2
             ]
         },
         "perspective": {
@@ -18,10 +18,10 @@
         ],
         "renderer": "Isosurface",
         "params": {
-            "isovalue": 0.8,
-            "mode": "DebCache",
+            "isovalue": 0.5,
+            "mode": "Normal",
             "density": 1e-1,
-            "max_steps": 500,
+            "max_steps": 1000,
             "transfer_fn": {
                 "values": [
                     [

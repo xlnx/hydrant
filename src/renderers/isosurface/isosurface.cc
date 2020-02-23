@@ -18,6 +18,7 @@ VM_EXPORT
 
 		auto params = cfg.params.get<IsosurfaceRendererConfig>();
 		shader.isovalue = params.isovalue;
+		shader.mode = params.mode;
 
 		lvl0_arch = &dataset->meta.sample_levels[ 0 ].archives[ 0 ];
 

@@ -7,7 +7,7 @@
 #include <hydrant/unarchive_pipeline.hpp>
 
 #define MAX_SAMPLER_COUNT ( 256 )
-#define MAX_BLOCK_COUNT ( 16 )
+#define MAX_BLOCK_COUNT ( 64 )
 
 VM_BEGIN_MODULE( hydrant )
 

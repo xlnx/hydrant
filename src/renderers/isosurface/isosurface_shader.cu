@@ -56,7 +56,7 @@ struct IsosurfaceShaderKernel : IsosurfaceShader
 						float a = ( isovalue - prev_value ) / ( value - prev_value );
 						vec3 inter_p = ( 1.f - a ) * ( p - dt * d ) + a * p;
 						/* TODO: sample at different dt for each axis to avoid having undo scaling */
-						vec3 nn = gradient( sampler, inter_p - ip, dt );
+						vec3 nn = gradient( sampler, inter_p - ip, dt * 4.f );
 
 						/* TODO: can we optimize somehow? */
 						auto &world_p = inter_p;
@@ -67,8 +67,18 @@ struct IsosurfaceShaderKernel : IsosurfaceShader
 						float diffuse = .6f * clamp( dot( light_dir, n ), 0.f, 1.f );
 						float specular = .2f * pow( clamp( dot( h, n ), 0.f, 1.f ), 100.f );
 						// float distance = length( world_p ); /* eye is at origin */
-
-						pixel.v = pixel.v * ( ambient + ( diffuse + specular ) );
+						
+						switch ( mode._to_integral() ) {
+						case IsosurfaceRenderMode::Color: {
+							pixel.v = pixel.v * ( ambient + ( diffuse + specular ) );
+						} break;
+						case IsosurfaceRenderMode::Position: {
+							pixel.v = vec4( inter_p / bbox.max, 1 );
+						} break;
+						case IsosurfaceRenderMode::Normal: {
+							pixel.v = vec4( n, 1 );
+						} break;
+						}
 
 						break;
 					}

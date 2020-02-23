@@ -49,19 +49,21 @@ VM_EXPORT
 			shader.max_steps = params.max_steps;
 
 			auto &lvl0 = dataset->meta.sample_levels[ 0 ];
-			dim = vec3( lvl0.archives[ 0 ].dim.x,
-						lvl0.archives[ 0 ].dim.y,
-						lvl0.archives[ 0 ].dim.z );
+			auto &lvl0_arch = lvl0.archives[ 0 ];
+			auto lvl0_blksz = float( lvl0_arch.block_size );
+			dim = vec3( lvl0_arch.dim.x,
+						lvl0_arch.dim.y,
+						lvl0_arch.dim.z );
 			auto raw = vec3( lvl0.raw.x,
 							 lvl0.raw.y,
 							 lvl0.raw.z );
-			auto f_dim = raw / float( lvl0.archives[ 0 ].block_size );
+			auto f_dim = raw / lvl0_blksz;
 			exhibit = Exhibit{}
 						.set_center( f_dim / 2.f )
 						.set_size( f_dim );
 
 			shader.bbox = Box3D{ { 0, 0, 0 }, f_dim };
-			shader.step = 1e-2f * f_dim.x / 4.f;
+			shader.step = .5f / lvl0_blksz;
 
 			return true;
 		}
