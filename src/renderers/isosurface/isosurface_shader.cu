@@ -59,18 +59,18 @@ struct IsosurfaceShaderKernel : IsosurfaceShader
 						vec3 nn = gradient( sampler, inter_p - ip, dt * 4.f );
 
 						/* TODO: can we optimize somehow? */
-						auto &world_p = inter_p;
-						vec3 n = normalize( nn );
-						vec3 light_dir = normalize( vec3( 0, 10, 0 ) - world_p );
+						vec3 world_p = vec3( to_world * vec4( inter_p, 1.f ) );
+						vec3 n = normalize( vec3( to_world * vec4( nn, 0.f ) ) );
+						vec3 light_dir = normalize( light_pos - world_p );
 						vec3 h = normalize( light_dir - world_p ); /* eye is at origin */
 						const float ambient = 0.2;
 						float diffuse = .6f * clamp( dot( light_dir, n ), 0.f, 1.f );
 						float specular = .2f * pow( clamp( dot( h, n ), 0.f, 1.f ), 100.f );
-						// float distance = length( world_p ); /* eye is at origin */
-						
+						float distance = length( world_p - eye_pos ) / 2.f;
+
 						switch ( mode._to_integral() ) {
 						case IsosurfaceRenderMode::Color: {
-							pixel.v = pixel.v * ( ambient + ( diffuse + specular ) );
+							pixel.v = pixel.v * ( ambient + ( diffuse + specular ) / distance );
 						} break;
 						case IsosurfaceRenderMode::Position: {
 							pixel.v = vec4( inter_p / bbox.max, 1 );

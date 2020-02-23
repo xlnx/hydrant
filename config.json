@@ -16,10 +16,11 @@
             800,
             800
         ],
-        "renderer": "Isosurface",
+        "renderer": "Volume",
         "params": {
+			"light_pos": [1, 1, 1],
             "isovalue": 0.5,
-            "mode": "Normal",
+            "mode": "Volume",
             "density": 1e-1,
             "max_steps": 1000,
             "transfer_fn": {

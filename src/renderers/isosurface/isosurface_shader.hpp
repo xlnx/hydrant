@@ -17,6 +17,9 @@ VM_EXPORT
 	struct IsosurfaceShader : IShader<StdVec4Pixel>
 	{
 		IsosurfaceRenderMode mode;
+		mat4 to_world;
+		vec3 eye_pos;
+		vec3 light_pos;
 		float isovalue;
 		Sampler chebyshev;
 		RtBlockPagingClient paging;

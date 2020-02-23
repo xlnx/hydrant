@@ -19,6 +19,7 @@ VM_EXPORT
 		auto params = cfg.params.get<IsosurfaceRendererConfig>();
 		shader.isovalue = params.isovalue;
 		shader.mode = params.mode;
+		shader.light_pos = params.light_pos;
 
 		lvl0_arch = &dataset->meta.sample_levels[ 0 ].archives[ 0 ];
 
@@ -158,6 +159,8 @@ VM_EXPORT
 		  [&]( auto &frame, auto frame_idx ) {
 			  std::size_t ns = 0, ns1 = 0;
 
+			  shader.to_world = inverse( exhibit.get_iet() );
+			  shader.eye_pos = loop.camera.position;
 			  shader.paging = srv.update( culler, loop.camera );
 
 			  {

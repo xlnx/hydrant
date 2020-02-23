@@ -6,8 +6,7 @@
 #include <hydrant/unarchiver.hpp>
 #include <hydrant/unarchive_pipeline.hpp>
 
-#define MAX_SAMPLER_COUNT ( 256 )
-#define MAX_BLOCK_COUNT ( 64 )
+#define MAX_SAMPLER_COUNT ( 4096 )
 
 VM_BEGIN_MODULE( hydrant )
 
@@ -85,6 +84,7 @@ public:
 
 public:
 	RtBlockPagingServerOptions opts;
+	size_t max_block_count;
 	MtArchive *lvl0_arch;
 
 	vector<LowestLevelBlock> lowest_blocks;
@@ -235,6 +235,12 @@ RtBlockPagingServerImpl::RtBlockPagingServerImpl( RtBlockPagingServerOptions con
 						  .set_dim( pad_bs )
 						  .set_device( opts.device )
 						  .set_opts( opts.storage_opts );
+	
+	auto mem_limit_bytes = opts.mem_limit_mb * 1024 * 1024;
+	auto block_bytes = pad_bs * pad_bs * pad_bs;
+	max_block_count = mem_limit_bytes / block_bytes;
+	max_block_count = std::min( max_block_count, MAX_SAMPLER_COUNT - lowest_blocks.size() );
+	vm::println( "MAX_BLOCK_COUNT = {}", max_block_count );
 
 	unarchiver.reset( new Unarchiver( opts.dataset->root.resolve( lvl0_arch->path ).resolved() ) );
 	pipeline.reset(
@@ -243,7 +249,7 @@ RtBlockPagingServerImpl::RtBlockPagingServerImpl( RtBlockPagingServerOptions con
 		[&, storage_opts, mapping]( auto &idx, auto &buffer ) {
 			unique_lock<mutex> lk( idxs_mut );
 			int vaddr_id = -1;
-			if ( block_storage.size() < MAX_BLOCK_COUNT ) {
+			if ( block_storage.size() < max_block_count ) {
 				/* skip those lowest blocks */
 				auto storage_id = block_storage.size();
 				vaddr_id = lowest_blocks.size() + storage_id;
@@ -285,17 +291,17 @@ RtBlockPagingServerImpl::RtBlockPagingServerImpl( RtBlockPagingServerOptions con
 
 void RtBlockPagingServerImpl::update( OctreeCuller &culler, Camera const &camera )
 {
-	auto require_idxs = culler.cull( camera, MAX_BLOCK_COUNT );
+	auto require_idxs = culler.cull( camera, max_block_count );
 	{
 		std::unique_lock<std::mutex> lk( idxs_mut );
 
-		missing_idxs.resize( MAX_BLOCK_COUNT );
+		missing_idxs.resize( max_block_count );
 		auto missing_idxs_end = set_difference( require_idxs.begin(), require_idxs.end(),
 												present_idxs.begin(), present_idxs.end(),
 												missing_idxs.begin() );
 		missing_idxs.resize( missing_idxs_end - missing_idxs.begin() );
 
-		redundant_idxs.resize( MAX_BLOCK_COUNT );
+		redundant_idxs.resize( max_block_count );
 		auto redundant_idxs_end = set_difference( present_idxs.begin(), present_idxs.end(),
 												  require_idxs.begin(), require_idxs.end(),
 												  redundant_idxs.begin() );

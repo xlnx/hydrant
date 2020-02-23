@@ -50,6 +50,7 @@ VM_EXPORT
 	struct RtBlockPagingServerOptions
 	{
 		VM_DEFINE_ATTRIBUTE( uvec3, dim );
+		VM_DEFINE_ATTRIBUTE( std::size_t, mem_limit_mb ) = 1024 * 2;
 		VM_DEFINE_ATTRIBUTE( std::shared_ptr<Dataset>, dataset );
 		VM_DEFINE_ATTRIBUTE( vm::Option<cufx::Device>, device );
 		VM_DEFINE_ATTRIBUTE( cufx::Texture::Options, storage_opts );
