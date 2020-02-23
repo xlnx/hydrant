@@ -12,7 +12,6 @@ VM_EXPORT
 	struct IsosurfaceRendererConfig : vm::json::Serializable<IsosurfaceRendererConfig>
 	{
 		VM_JSON_FIELD( IsosurfaceRenderMode, mode ) = IsosurfaceRenderMode::Color;
-		VM_JSON_FIELD( vec3, light_pos ) = vec3( 1, 1, 1 );
 		VM_JSON_FIELD( float, isovalue ) = 0.5f;
 		VM_JSON_FIELD( std::size_t, mem_limit_mb ) = 1024 * 2;
 	};

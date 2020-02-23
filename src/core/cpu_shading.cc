@@ -60,7 +60,8 @@ void pixel_task_dispatch( ThreadPoolInfo const &thread_pool_info,
 			  for ( int y = y0; y < args.image_desc.resolution.y; y += thread_pool_info.nthreads ) {
 				  for ( int x = 0; x < args.image_desc.resolution.x; ++x ) {
 					  launcher( args.image_desc.data + args.image_desc.pixel_size * ( args.image_desc.resolution.x * y + x ),
-								args.dst_desc.data + args.dst_desc.pixel_size * ( args.dst_desc.resolution.x * y + x ) );
+								args.dst_desc.data + args.dst_desc.pixel_size * ( args.dst_desc.resolution.x * y + x ),
+								&args.clear_color );
 				  }
 			  }
 		  } );

@@ -29,6 +29,7 @@ VM_EXPORT
 	{
 		VM_JSON_FIELD( ShadingDevice, device ) = ShadingDevice::Cuda;
 		VM_JSON_FIELD( int, max_steps ) = 500;
+		VM_JSON_FIELD( vec3, clear_color ) = vec3( 0 );
 	};
 
 	template <typename Shader>
@@ -47,6 +48,7 @@ VM_EXPORT
 				}
 			}
 			shader.max_steps = params.max_steps;
+			clear_color = params.clear_color;
 
 			auto &lvl0 = dataset->meta.sample_levels[ 0 ];
 			auto &lvl0_arch = lvl0.archives[ 0 ];
@@ -93,6 +95,7 @@ VM_EXPORT
 
 	protected:
 		vm::Option<cufx::Device> device;
+		vec3 clear_color;
 		uvec3 dim;
 		Shader shader;
 		Exhibit exhibit;

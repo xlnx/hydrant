@@ -40,12 +40,12 @@ VM_EXPORT
 	cufx::Image<> BlocksRenderer::offline_render( Camera const &camera )
 	{
 		auto film = create_film();
-		raycaster.cast( exhibit,
-						camera,
-						film.view(),
-						shader,
-						RaycastingOptions{}
-						  .set_device( device ) );
+		raycaster.ray_emit_pass( exhibit,
+								 camera,
+								 film.view(),
+								 shader,
+								 RaycastingOptions{}
+								   .set_device( device ) );
 		return film.fetch_data().dump();
 	}
 

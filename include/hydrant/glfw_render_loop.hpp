@@ -59,7 +59,7 @@ VM_EXPORT
 			check_gl_error();
 
 			glDrawPixels( resolution.x, resolution.y,
-						  GL_RGBA, GL_UNSIGNED_BYTE, &frame.at( 0, 0 ) );
+						  GL_RGB, GL_UNSIGNED_BYTE, &frame.at( 0, 0 ) );
 
 			check_gl_error();
 

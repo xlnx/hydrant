@@ -69,7 +69,8 @@ __global__ void
 
 	auto shader = (pixel_shader_t *)args.function_desc.fp;
 	shader( args.image_desc.data + args.image_desc.pixel_size * ( args.image_desc.resolution.x * y + x ),
-			args.dst_desc.data + args.dst_desc.pixel_size * ( args.dst_desc.resolution.x * y + x ) );
+			args.dst_desc.data + args.dst_desc.pixel_size * ( args.dst_desc.resolution.x * y + x ),
+			&args.clear_color );
 }
 
 CUFX_DEFINE_KERNEL( pixel_kernel, pixel_kernel_impl );

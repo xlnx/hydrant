@@ -2,8 +2,8 @@
     "camera": {
         "orbit": {
             "arm": [
-                30,
-                30,
+                0,
+                0,
                 2.2
             ]
         },
@@ -13,14 +13,23 @@
     },
     "render": {
         "resolution": [
-            800,
-            800
+            512,
+            512
         ],
-        "renderer": "Volume",
+        "renderer": "Isosurface",
         "params": {
-			"light_pos": [1, 1, 1],
+            "light_pos": [
+                1,
+                1,
+                1
+            ],
+            "clear_color": [
+                1,
+                0.965,
+                0.839
+            ],
             "isovalue": 0.5,
-            "mode": "Volume",
+            "mode": "Color",
             "density": 1e-1,
             "max_steps": 1000,
             "transfer_fn": {

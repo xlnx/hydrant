@@ -24,6 +24,15 @@ struct IsosurfaceShaderKernel : IsosurfaceShader
 					 s.sample_3d<float>( p - vec3( 0, 0, dt ) ) - s.sample_3d<float>( p + vec3( 0, 0, dt ) ) );
 	}
 
+	__host__ __device__ float
+	  linear_to_srgb( float linear ) const
+	{
+		if ( linear <= 0.0031308 )
+			return 12.92 * linear;
+		else
+			return ( 1.0 + 0.055 ) * pow( linear, 1.0 / 2.4 ) - 0.055;
+	}
+
 	__host__ __device__ void
 	  main( Pixel &pixel_in_out ) const
 	{
@@ -63,6 +72,7 @@ struct IsosurfaceShaderKernel : IsosurfaceShader
 						vec3 n = normalize( vec3( to_world * vec4( nn, 0.f ) ) );
 						vec3 light_dir = normalize( light_pos - world_p );
 						vec3 h = normalize( light_dir - world_p ); /* eye is at origin */
+
 						const float ambient = 0.2;
 						float diffuse = .6f * clamp( dot( light_dir, n ), 0.f, 1.f );
 						float specular = .2f * pow( clamp( dot( h, n ), 0.f, 1.f ), 100.f );
@@ -71,6 +81,10 @@ struct IsosurfaceShaderKernel : IsosurfaceShader
 						switch ( mode._to_integral() ) {
 						case IsosurfaceRenderMode::Color: {
 							pixel.v = pixel.v * ( ambient + ( diffuse + specular ) / distance );
+							pixel.v = vec4( linear_to_srgb( pixel.v.r ),
+											linear_to_srgb( pixel.v.g ),
+											linear_to_srgb( pixel.v.b ),
+											pixel.v.a );
 						} break;
 						case IsosurfaceRenderMode::Position: {
 							pixel.v = vec4( inter_p / bbox.max, 1 );
@@ -79,6 +93,8 @@ struct IsosurfaceShaderKernel : IsosurfaceShader
 							pixel.v = vec4( n, 1 );
 						} break;
 						}
+
+						nsteps = 0;
 
 						break;
 					}

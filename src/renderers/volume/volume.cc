@@ -170,16 +170,16 @@ VM_EXPORT
 
 				  auto opts = RaycastingOptions{}.set_device( device );
 
-				  raycaster.cast( exhibit,
-								  loop.camera,
-								  film.view(),
-								  shader,
-								  opts );
+				  raycaster.ray_emit_pass( exhibit,
+										   loop.camera,
+										   film.view(),
+										   shader,
+										   opts );
 
-				  raycaster.cast( film.view(),
-								  frame.view(),
-								  shader,
-								  opts );
+				  raycaster.pixel_pass( film.view(),
+										frame.view(),
+										shader,
+										opts );
 			  }
 		  },
 		  [&]( auto &frame, auto frame_idx ) {

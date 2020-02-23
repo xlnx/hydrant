@@ -148,15 +148,16 @@ __device__ ray_march_shader_t *p_ray_march_shader = ray_march_shader_impl<P, F>;
 
 template <typename P, typename F>
 __host__ __device__ void
-  pixel_shader_impl( void const *pixel_in, void *pixel_out )
+  pixel_shader_impl( void const *pixel_in, void *pixel_out, void const *clear_color )
 {
 	auto &pixel_in_ = *reinterpret_cast<P const *>( pixel_in );
-	auto &pixel_out_ = *reinterpret_cast<uchar4 *>( pixel_out );
+	auto &pixel_out_ = *reinterpret_cast<uchar3 *>( pixel_out );
+	auto &clear_color_ = *reinterpret_cast<uchar3 const *>( clear_color );
 
-	pixel_in_.write_to( pixel_out_ );
+	pixel_in_.write_to( pixel_out_, clear_color_ );
 }
 
-using pixel_shader_t = void( void const *, void * );
+using pixel_shader_t = void( void const *, void *, void const * );
 
 template <typename P, typename F>
 __device__ pixel_shader_t *p_pixel_shader = pixel_shader_impl<P, F>;
@@ -181,6 +182,7 @@ struct BasicRayMarchKernelArgs : BasicKernelArgs
 struct BasicPixelKernelArgs : BasicKernelArgs
 {
 	ImageDesc dst_desc;
+	tvec3<unsigned char> clear_color;
 };
 
 struct CpuKernelLauncher
