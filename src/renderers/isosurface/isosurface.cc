@@ -20,6 +20,10 @@ VM_EXPORT
 		shader.isovalue = params.isovalue;
 		shader.mode = params.mode;
 
+		vm::println( "STEP = {}", shader.step );
+		vm::println( "MAX_STEPS = {}", shader.max_steps );
+		vm::println( "MARCH_DIST = {}", shader.max_steps * shader.step );
+
 		lvl0_arch = &dataset->meta.sample_levels[ 0 ].archives[ 0 ];
 
 		chebyshev_thumb.reset(

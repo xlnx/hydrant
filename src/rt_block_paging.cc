@@ -240,6 +240,8 @@ RtBlockPagingServerImpl::RtBlockPagingServerImpl( RtBlockPagingServerOptions con
 	auto block_bytes = pad_bs * pad_bs * pad_bs;
 	max_block_count = mem_limit_bytes / block_bytes;
 	max_block_count = std::min( max_block_count, MAX_SAMPLER_COUNT - lowest_blocks.size() );
+	vm::println( "MEM_LIMIT_BYTES = {}", mem_limit_bytes );
+	vm::println( "BLOCK_BYTES = {}", block_bytes );
 	vm::println( "MAX_BLOCK_COUNT = {}", max_block_count );
 
 	unarchiver.reset( new Unarchiver( opts.dataset->root.resolve( lvl0_arch->path ).resolved() ) );
@@ -249,11 +251,15 @@ RtBlockPagingServerImpl::RtBlockPagingServerImpl( RtBlockPagingServerOptions con
 		[&, storage_opts, mapping]( auto &idx, auto &buffer ) {
 			unique_lock<mutex> lk( idxs_mut );
 			int vaddr_id = -1;
+			if ( present_idxs.count( idx ) ) {
+				vm::println( "abandoned {}", idx );
+				return;
+			}
 			if ( block_storage.size() < max_block_count ) {
 				/* skip those lowest blocks */
 				auto storage_id = block_storage.size();
 				vaddr_id = lowest_blocks.size() + storage_id;
-				vm::println( "allocate {}", storage_id );
+				// vm::println( "allocate {}", storage_id );
 				block_storage.emplace_back( storage_opts );
 			} else if ( redundant_idxs.size() ) {
 				auto swap_idx = redundant_idxs.back();
@@ -266,12 +272,11 @@ RtBlockPagingServerImpl::RtBlockPagingServerImpl( RtBlockPagingServerOptions con
 				/* reset that block to lowest sample level */
 				swap_vaddr = basic_vaddr_buf[ uvec3_idx ];
 			} else {
-				// vm::println( "block {} abandoned", idx );
-				return;
+				throw logic_error( vm::fmt( "internal error: invalid state when transferring block {}", idx ) );
 			}
 
 			auto storage_id = vaddr_id - lowest_blocks.size();
-			vm::println( "at {}", storage_id );
+			// vm::println( "at {}", storage_id );
 			auto &storage = block_storage[ storage_id ];
 			auto fut = storage.source( buffer.view_3d() );
 			fut.wait();
@@ -283,7 +288,7 @@ RtBlockPagingServerImpl::RtBlockPagingServerImpl( RtBlockPagingServerOptions con
 
 			vaddr_buf[ uvec3( idx.x, idx.y, idx.z ) ] = vaddr_id;
 			present_idxs.insert( idx );
-			vm::println( "u+ {}", idx );
+			// vm::println( "u+ {}", idx );
 		},
 		UnarchivePipelineOptions{}
 		  .set_device( opts.device ) ) );
@@ -306,16 +311,6 @@ void RtBlockPagingServerImpl::update( OctreeCuller &culler, Camera const &camera
 												  require_idxs.begin(), require_idxs.end(),
 												  redundant_idxs.begin() );
 		redundant_idxs.resize( redundant_idxs_end - redundant_idxs.begin() );
-
-		if ( missing_idxs.size() ) {
-			/// vm::println( "{}", missing_idxs );
-		}
-		//   for ( auto it = missing_idxs_end; it != redundant_idxs_end; ++it ) {
-		// 	  present_idxs.erase( *it );
-		//   }
-		//   for ( auto &idx : missing_idxs ) {
-		// 	  present_idxs.insert( idx );
-		//   }
 
 		if ( missing_idxs.size() ) {
 			pipeline->lock().require( missing_idxs.begin(),
