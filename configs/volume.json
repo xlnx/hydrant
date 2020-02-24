@@ -18,20 +18,8 @@
         ],
         "renderer": "Volume",
         "params": {
-            "light_pos": [
-                1,
-                1,
-                1
-            ],
-            "clear_color": [
-                1,
-                0.965,
-                0.839
-            ],
-            "isovalue": 0.5,
-            "mode": "DebCache",
             "density": 1e-1,
-            "max_steps": 1000,
+            "max_steps": 4000,
             "transfer_fn": {
                 "values": [
                     [

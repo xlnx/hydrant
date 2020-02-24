@@ -1,0 +1,36 @@
+{
+    "camera": {
+        "orbit": {
+            "arm": [
+                0,
+                0,
+                2.2
+            ]
+        },
+        "perspective": {
+            "fovy": 60
+        }
+    },
+    "render": {
+        "resolution": [
+            512,
+            512
+        ],
+        "renderer": "Isosurface",
+        "params": {
+            "light_pos": [
+                1,
+                1,
+                1
+            ],
+            "clear_color": [
+                1,
+                0.965,
+                0.839
+            ],
+            "isovalue": 0.4,
+            "mode": "Color",
+            "max_steps": 4000
+        }
+    }
+}
