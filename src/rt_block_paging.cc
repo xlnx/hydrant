@@ -266,7 +266,7 @@ RtBlockPagingServerImpl::RtBlockPagingServerImpl( RtBlockPagingServerOptions con
 				/* reset that block to lowest sample level */
 				swap_vaddr = basic_vaddr_buf[ uvec3_idx ];
 			} else {
-				vm::println( "block {} abandoned", idx );
+				// vm::println( "block {} abandoned", idx );
 				return;
 			}
 
@@ -308,7 +308,7 @@ void RtBlockPagingServerImpl::update( OctreeCuller &culler, Camera const &camera
 		redundant_idxs.resize( redundant_idxs_end - redundant_idxs.begin() );
 
 		if ( missing_idxs.size() ) {
-			vm::println( "{}", missing_idxs );
+			/// vm::println( "{}", missing_idxs );
 		}
 		//   for ( auto it = missing_idxs_end; it != redundant_idxs_end; ++it ) {
 		// 	  present_idxs.erase( *it );

@@ -67,7 +67,7 @@ VM_EXPORT
 					   pipeline.required.end(),
 					   ee.begin(), [](auto &e){ return e.first; });
 		if (ee.size()) {
-			vm::println("unarchiver: require {}", ee);
+			// vm::println("unarchiver: require {}", ee);
 		}
 		lk.unlock();
 		pipeline.cv.notify_one();
@@ -138,7 +138,7 @@ VM_EXPORT
 								std::transform(required.begin(),
 											   required.end(),
 											   ee.begin(), [](auto &e){ return e.first; });
-						  vm::println("unarchiver: req down to {}", ee);
+						  // vm::println("unarchiver: req down to {}", ee);
 					  }
 					  if ( still_need[ sn_idx ].first.load() ) {
 						  on_data( idx, *buf );

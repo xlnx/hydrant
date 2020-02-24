@@ -16,7 +16,7 @@
             512,
             512
         ],
-        "renderer": "Isosurface",
+        "renderer": "Volume",
         "params": {
             "light_pos": [
                 1,
@@ -29,7 +29,7 @@
                 0.839
             ],
             "isovalue": 0.5,
-            "mode": "Color",
+            "mode": "DebCache",
             "density": 1e-1,
             "max_steps": 1000,
             "transfer_fn": {
