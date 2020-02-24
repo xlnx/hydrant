@@ -19,7 +19,6 @@ VM_EXPORT
 		auto params = cfg.params.get<VolumeRendererConfig>();
 		// shader.render_mode = params.mode == "volume" ? BrmVolume : BrmSolid;
 		shader.density = params.density;
-		shader.mode = params.mode;
 		transfer_fn = TransferFn( params.transfer_fn, device );
 		shader.transfer_fn = transfer_fn.sampler();
 

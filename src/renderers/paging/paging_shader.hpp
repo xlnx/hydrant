@@ -11,10 +11,12 @@ VM_BEGIN_MODULE( hydrant )
 
 VM_EXPORT
 {
-	struct VolumeShader : IShader<StdVec4Pixel>
+	// VM_ENUM( PagingRenderMode,
+	// 		 Color, Normal, Position );
+
+	struct PagingShader : IShader<StdVec4Pixel>
 	{
-		float density;
-		Sampler transfer_fn;
+		// PagingRenderMode mode;
 		Sampler chebyshev;
 		RtBlockPagingClient paging;
 	};

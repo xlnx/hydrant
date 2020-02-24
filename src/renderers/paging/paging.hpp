@@ -1,22 +1,23 @@
+#pragma once
 
+#include <varch/utils/io.hpp>
 #include <hydrant/basic_renderer.hpp>
 #include <hydrant/transfer_fn.hpp>
-#include "volume_shader.hpp"
+#include "paging_shader.hpp"
 
 VM_BEGIN_MODULE( hydrant )
 
 VM_EXPORT
 {
-	struct VolumeRendererConfig : vm::json::Serializable<VolumeRendererConfig>
+	struct PagingRendererConfig : vm::json::Serializable<PagingRendererConfig>
 	{
-		VM_JSON_FIELD( TransferFnConfig, transfer_fn );
-		VM_JSON_FIELD( float, density ) = 1e-2f;
+		// VM_JSON_FIELD( IsosurfaceRenderMode, mode ) = IsosurfaceRenderMode::Color;
 		VM_JSON_FIELD( std::size_t, mem_limit_mb ) = 1024 * 2;
 	};
 
-	struct VolumeRenderer : BasicRenderer<VolumeShader>
+	struct PagingRenderer : BasicRenderer<PagingShader>
 	{
-		using Super = BasicRenderer<VolumeShader>;
+		using Super = BasicRenderer<PagingShader>;
 
 		bool init( std::shared_ptr<Dataset> const &dataset,
 				   RendererConfig const &cfg ) override;
@@ -26,7 +27,6 @@ VM_EXPORT
 		void render_loop( IRenderLoop &loop ) override;
 
 	private:
-		TransferFn transfer_fn;
 		vol::MtArchive *lvl0_arch;
 
 		std::shared_ptr<vol::Thumbnail<int>> chebyshev_thumb;

@@ -1,8 +1,8 @@
-#include "volume.hpp"
+#include "paging_shader.hpp"
 
 VM_BEGIN_MODULE( hydrant )
 
-struct VolumeShaderKernel : VolumeShader
+struct PagingShaderKernel : PagingShader
 {
 	__host__ __device__ int
 	  skip_nblock_steps( Ray &ray, vec3 const &ip,
@@ -32,17 +32,19 @@ struct VolumeShaderKernel : VolumeShader
 			} else {
 				auto pgid = paging.vaddr.sample_3d<int>( ip );
 				if ( pgid != -1 ) {
-					auto spl = paging.block_sampler[ pgid ].sample_3d<float>( ray.o - ip );
-					auto val = transfer_fn.sample_1d<vec4>( spl );
-					auto col = val * density;
+					vec4 col;
+					if ( pgid >= paging.lowest_blkcnt ) {
+						col = vec4( 0, 1, 0, 1 ) * .5f;
+					} else {
+						col = vec4( 1, 0, 0, 1 ) * .2f;
+					}
+					nsteps -= skip_nblock_steps( ray, ip, 1, cdu, step );
 					pixel.v += col * ( 1.f - pixel.v.w );
 					if ( pixel.v.w > opacity_threshold ) {
 						break;
 					}
 				} else {
-					// ivec3 ipm = mod( ip, vec3( MAXX ) );
-					// absent_coord[ ipm.x ][ ipm.y ][ ipm.z ] = ip;
-					// is_absent[ ipm.x ][ ipm.y ][ ipm.z ] = true;
+					/* page fault */
 					break;
 				}
 			}
@@ -54,9 +56,9 @@ struct VolumeShaderKernel : VolumeShader
 };
 
 REGISTER_SHADER_BUILDER(
-  name( "volume_shader" )
-	.cuda<VolumeShaderKernel>()
-	.cpu<VolumeShaderKernel>(),
-  VolumeShader );
+  name( "paging_shader" )
+	.cuda<PagingShaderKernel>()
+	.cpu<PagingShaderKernel>(),
+  PagingShader );
 
 VM_END_MODULE()
