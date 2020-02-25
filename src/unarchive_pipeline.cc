@@ -62,13 +62,6 @@ VM_EXPORT
 				}
 			}
 		}
-		std::vector<vol::Idx> ee(pipeline.required.size());
-		std::transform(pipeline.required.begin(),
-					   pipeline.required.end(),
-					   ee.begin(), [](auto &e){ return e.first; });
-		if (ee.size()) {
-			// vm::println("unarchiver: require {}", ee);
-		}
 		lk.unlock();
 		pipeline.cv.notify_one();
 	}
@@ -134,11 +127,6 @@ VM_EXPORT
 								return a.first == idx;
 							} );
 						  required.erase( it );
-						  		std::vector<vol::Idx> ee(required.size());
-								std::transform(required.begin(),
-											   required.end(),
-											   ee.begin(), [](auto &e){ return e.first; });
-						  // vm::println("unarchiver: req down to {}", ee);
 					  }
 					  if ( still_need[ sn_idx ].first.load() ) {
 						  on_data( idx, *buf );
