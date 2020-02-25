@@ -65,7 +65,7 @@ VM_EXPORT
 						.set_size( f_dim );
 
 			shader.bbox = Box3D{ { 0, 0, 0 }, f_dim };
-			shader.step = .5f / lvl0_blksz;
+			shader.step = 1.f / lvl0_blksz;
 
 			return true;
 		}

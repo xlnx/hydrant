@@ -6,9 +6,9 @@ dst_dir=$2
 toolkit_dir=./build/external_build/varch/tools
 tmp_dir=/tmp/downsample
 
-dx=1024
-dy=1024
-dz=795
+dx=256
+dy=256
+dz=256
 
 log_bs=6
 pad=2
