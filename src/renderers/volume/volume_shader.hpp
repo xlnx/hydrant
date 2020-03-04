@@ -5,7 +5,7 @@
 #include <hydrant/core/shader.hpp>
 #include <hydrant/bridge/sampler.hpp>
 #include <hydrant/pixel_template.hpp>
-#include <hydrant/rt_block_paging.hpp>
+#include <hydrant/paging/block_paging.hpp>
 
 VM_BEGIN_MODULE( hydrant )
 
@@ -16,7 +16,7 @@ VM_EXPORT
 		float density;
 		Sampler transfer_fn;
 		Sampler chebyshev;
-		RtBlockPagingClient paging;
+		BlockPaging paging;
 	};
 }
 

@@ -1,7 +1,7 @@
 #include <VMUtils/timer.hpp>
 #include <varch/thumbnail.hpp>
 #include <hydrant/double_buffering.hpp>
-#include <hydrant/rt_block_paging.hpp>
+#include <hydrant/paging/rt_block_paging.hpp>
 #include "paging.hpp"
 
 using namespace std;
@@ -29,13 +29,13 @@ VM_EXPORT
 		return true;
 	}
 
-	cufx::Image<> PagingRenderer::offline_render( Camera const &camera )
+	cufx::Image<> PagingRenderer::offline_render_ctxed( OfflineRenderCtx & ctx, Camera const &camera )
 	{
 		auto film = create_film();
 		return film.fetch_data().dump();
 	}
 
-	void PagingRenderer::render_loop( IRenderLoop & loop )
+	void PagingRenderer::realtime_render_dynamic( IRenderLoop & loop )
 	{
 		auto film = create_film();
 

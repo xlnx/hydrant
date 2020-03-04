@@ -26,6 +26,14 @@ VM_EXPORT
 		VM_JSON_FIELD( vm::json::Any, params ) = vm::json::Any();
 	};
 
+	VM_ENUM( RealtimeRenderQuality,
+			 Lossless, Dynamic );
+
+	struct RealtimeRenderOptions : vm::json::Serializable<RealtimeRenderOptions>
+	{
+		VM_JSON_FIELD( RealtimeRenderQuality, quality ) = RealtimeRenderQuality::Dynamic;
+	};
+
 	struct IRenderer : vm::Dynamic
 	{
 		virtual bool init( std::shared_ptr<Dataset> const &dataset, RendererConfig const &cfg )
@@ -37,16 +45,7 @@ VM_EXPORT
 
 		virtual cufx::Image<> offline_render( Camera const &camera ) = 0;
 
-		virtual void render_loop( IRenderLoop &loop )
-		{
-			loop.post_loop();
-			while ( !loop.should_stop() ) {
-				loop.post_frame();
-				auto frame = offline_render( loop.camera );
-				loop.on_frame( frame );
-			}
-			loop.after_loop();
-		}
+		virtual void realtime_render( IRenderLoop &loop, RealtimeRenderOptions const &opts = RealtimeRenderOptions{} ) = 0;
 
 	protected:
 		std::shared_ptr<Dataset> dataset;

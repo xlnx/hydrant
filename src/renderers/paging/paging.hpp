@@ -22,9 +22,9 @@ VM_EXPORT
 		bool init( std::shared_ptr<Dataset> const &dataset,
 				   RendererConfig const &cfg ) override;
 
-		cufx::Image<> offline_render( Camera const &camera ) override;
+		cufx::Image<> offline_render_ctxed( OfflineRenderCtx &ctx, Camera const &camera ) override;
 
-		void render_loop( IRenderLoop &loop ) override;
+		void realtime_render_dynamic( IRenderLoop &loop ) override;
 
 	private:
 		vol::MtArchive *lvl0_arch;

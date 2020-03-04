@@ -32,6 +32,10 @@ VM_EXPORT
 		VM_JSON_FIELD( vec3, clear_color ) = vec3( 0 );
 	};
 
+	struct OfflineRenderCtx : vm::Dynamic
+	{
+	};
+
 	template <typename Shader>
 	struct BasicRenderer : IRenderer
 	{
@@ -69,6 +73,48 @@ VM_EXPORT
 
 			return true;
 		}
+
+	public:
+		cufx::Image<> offline_render( Camera const &camera ) override final
+		{
+			std::unique_ptr<OfflineRenderCtx> pctx( create_offline_render_ctx() );
+			return offline_render_ctxed( *pctx, camera );
+		}
+
+	protected:
+		virtual cufx::Image<> offline_render_ctxed( OfflineRenderCtx &ctx, Camera const &camera ) = 0;
+
+		virtual OfflineRenderCtx *create_offline_render_ctx() { return new OfflineRenderCtx; }
+
+	public:
+		void realtime_render( IRenderLoop &loop, RealtimeRenderOptions const &opts ) override final
+		{
+			switch ( opts.quality._to_integral() ) {
+			case RealtimeRenderQuality::Lossless: {
+				realtime_render_lossless( loop );
+			} break;
+			case RealtimeRenderQuality::Dynamic: {
+				realtime_render_dynamic( loop );
+			} break;
+			}
+		}
+
+	protected:
+		void realtime_render_default( IRenderLoop &loop )
+		{
+			std::unique_ptr<OfflineRenderCtx> pctx( create_offline_render_ctx() );
+			loop.post_loop();
+			while ( !loop.should_stop() ) {
+				loop.post_frame();
+				auto frame = offline_render_ctxed( *pctx, loop.camera );
+				loop.on_frame( frame );
+			}
+			loop.after_loop();
+		}
+
+		virtual void realtime_render_lossless( IRenderLoop &loop ) { realtime_render_default( loop ); }
+
+		virtual void realtime_render_dynamic( IRenderLoop &loop ) { realtime_render_default( loop ); }
 
 	public:
 		template <typename T>

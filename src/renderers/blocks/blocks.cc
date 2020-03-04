@@ -37,7 +37,7 @@ VM_EXPORT
 		return true;
 	}
 
-	cufx::Image<> BlocksRenderer::offline_render( Camera const &camera )
+	cufx::Image<> BlocksRenderer::offline_render_ctxed( OfflineRenderCtx & ctx, Camera const &camera )
 	{
 		auto film = create_film();
 		raycaster.ray_emit_pass( exhibit,

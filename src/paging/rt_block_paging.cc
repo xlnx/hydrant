@@ -1,10 +1,10 @@
 #include <set>
 #include <algorithm>
-#include <hydrant/rt_block_paging.hpp>
 #include <hydrant/bridge/texture_3d.hpp>
 #include <hydrant/bridge/buffer_3d.hpp>
 #include <hydrant/unarchiver.hpp>
-#include <hydrant/unarchive_pipeline.hpp>
+#include <hydrant/paging/unarchive_pipeline.hpp>
+#include <hydrant/paging/rt_block_paging.hpp>
 
 #define MAX_SAMPLER_COUNT ( 4096 )
 
@@ -31,7 +31,7 @@ struct RtBlockPagingRegistry
 	map<Idx, int> lowest_block_sampler_id;
 
 public:
-	RtBlockPagingRegistry( RtBlockPagingClient &client,
+	RtBlockPagingRegistry( BlockPaging &client,
 						   vector<LowestLevelBlock> const &lowest_blocks,
 						   vm::Option<cufx::Device> const &device )
 	{
@@ -104,7 +104,7 @@ public:
 
 	vector<Texture3D<unsigned char>> block_storage;
 
-	RtBlockPagingClient client;
+	BlockPaging client;
 };
 
 MtArchive const *RtBlockPagingServerImpl::sample_level( size_t level ) const
@@ -235,7 +235,7 @@ RtBlockPagingServerImpl::RtBlockPagingServerImpl( RtBlockPagingServerOptions con
 						  .set_dim( pad_bs )
 						  .set_device( opts.device )
 						  .set_opts( opts.storage_opts );
-	
+
 	auto mem_limit_bytes = opts.mem_limit_mb * 1024 * 1024;
 	auto block_bytes = pad_bs * pad_bs * pad_bs;
 	max_block_count = mem_limit_bytes / block_bytes;
@@ -336,7 +336,7 @@ VM_EXPORT
 	{
 	}
 
-	RtBlockPagingClient RtBlockPagingServer::update( OctreeCuller & culler, Camera const &camera )
+	BlockPaging RtBlockPagingServer::update( OctreeCuller & culler, Camera const &camera )
 	{
 		_->update( culler, camera );
 		return _->client;
