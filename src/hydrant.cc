@@ -1,6 +1,7 @@
 #include <fstream>
 #include <atomic>
 #include <cstdlib>
+#include <glog/logging.h>
 #include <cppfs/fs.h>
 #include <cppfs/FileHandle.h>
 #include <cppfs/FilePath.h>
@@ -19,13 +20,11 @@ inline void ensure_dir( std::string const &path_v )
 {
 	auto path = cppfs::fs::open( path_v );
 	if ( !path.exists() ) {
-		vm::eprintln( "the specified path '{}' doesn't exist",
-					  path_v );
-		exit( 1 );
+		LOG( FATAL ) << vm::fmt( "the specified path '{}' doesn't exist",
+								 path_v );
 	} else if ( !path.isDirectory() ) {
-		vm::eprintln( "the specified path '{}' is not a directory",
-					  path_v );
-		exit( 1 );
+		LOG( FATAL ) << vm::fmt( "the specified path '{}' is not a directory",
+								 path_v );
 	}
 }
 
@@ -33,13 +32,11 @@ inline void ensure_file( std::string const &path_v )
 {
 	auto path = cppfs::fs::open( path_v );
 	if ( !path.exists() ) {
-		vm::eprintln( "the specified path '{}' doesn't exist",
-					  path_v );
-		exit( 1 );
+		LOG( FATAL ) << vm::fmt( "the specified path '{}' doesn't exist",
+								 path_v );
 	} else if ( !path.isFile() ) {
-		vm::eprintln( "the specified path '{}' is not a file",
-					  path_v );
-		exit( 1 );
+		LOG( FATAL ) << vm::fmt( "the specified path '{}' is not a file",
+								 path_v );
 	}
 }
 

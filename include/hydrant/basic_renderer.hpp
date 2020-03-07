@@ -1,5 +1,6 @@
 #pragma once
 
+#include <regex>
 #include <varch/thumbnail.hpp>
 #include <cudafx/device.hpp>
 #include <hydrant/bridge/image.hpp>
@@ -28,6 +29,7 @@ VM_EXPORT
 	struct BasicRendererParams : vm::json::Serializable<BasicRendererParams>
 	{
 		VM_JSON_FIELD( ShadingDevice, device ) = ShadingDevice::Cuda;
+		VM_JSON_FIELD( std::string, device_filter ) = ".*";
 		VM_JSON_FIELD( int, max_steps ) = 500;
 		VM_JSON_FIELD( vec3, clear_color ) = vec3( 0 );
 	};
@@ -46,9 +48,22 @@ VM_EXPORT
 
 			auto params = cfg.params.get<BasicRendererParams>();
 			if ( params.device == ShadingDevice::Cuda ) {
-				device = cufx::Device::get_default();
-				if ( !device.has_value() ) {
-					vm::println( "cuda device not found, fallback to cpu render mode" );
+				try {
+					std::regex filter( params.device_filter );
+					auto devices = cufx::Device::scan();
+					for ( auto &device: devices ) {
+						auto props = device.props();
+						if ( std::regex_match( props.name, filter ) ) {
+							vm::println( "{}", props.name );
+						}
+					}
+					device = cufx::Device::get_default();
+					if ( !device.has_value() ) {
+						vm::println( "cuda device not found, fallback to cpu render mode" );
+					}
+				} catch ( std::regex_error &e ) {
+					vm::eprintln( vm::fmt( "invalid regex: '{}'", params.device_filter ) );
+					exit( 1 );
 				}
 			}
 			shader.max_steps = params.max_steps;

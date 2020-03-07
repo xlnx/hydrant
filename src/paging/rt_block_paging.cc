@@ -1,5 +1,6 @@
 #include <set>
 #include <algorithm>
+#include <glog/logging.h>
 #include <hydrant/bridge/texture_3d.hpp>
 #include <hydrant/bridge/buffer_3d.hpp>
 #include <hydrant/unarchiver.hpp>
@@ -240,9 +241,10 @@ RtBlockPagingServerImpl::RtBlockPagingServerImpl( RtBlockPagingServerOptions con
 	auto block_bytes = pad_bs * pad_bs * pad_bs;
 	max_block_count = mem_limit_bytes / block_bytes;
 	max_block_count = std::min( max_block_count, MAX_SAMPLER_COUNT - lowest_blocks.size() );
-	vm::println( "MEM_LIMIT_BYTES = {}", mem_limit_bytes );
-	vm::println( "BLOCK_BYTES = {}", block_bytes );
-	vm::println( "MAX_BLOCK_COUNT = {}", max_block_count );
+	
+	LOG( INFO ) << vm::fmt( "MEM_LIMIT_BYTES = {}", mem_limit_bytes );
+	LOG( INFO ) << vm::fmt( "BLOCK_BYTES = {}", block_bytes );
+	LOG( INFO ) << vm::fmt( "MAX_BLOCK_COUNT = {}", max_block_count );
 
 	unarchiver.reset( new Unarchiver( opts.dataset->root.resolve( lvl0_arch->path ).resolved() ) );
 	pipeline.reset(
@@ -252,7 +254,7 @@ RtBlockPagingServerImpl::RtBlockPagingServerImpl( RtBlockPagingServerOptions con
 			unique_lock<mutex> lk( idxs_mut );
 			int vaddr_id = -1;
 			if ( present_idxs.count( idx ) ) {
-				vm::println( "abandoned {}", idx );
+				LOG( WARNING ) << vm::fmt( "abandoned {}", idx );
 				return;
 			}
 			if ( block_storage.size() < max_block_count ) {
@@ -264,7 +266,7 @@ RtBlockPagingServerImpl::RtBlockPagingServerImpl( RtBlockPagingServerOptions con
 			} else if ( redundant_idxs.size() ) {
 				auto swap_idx = redundant_idxs.back();
 				redundant_idxs.pop_back();
-				vm::println( "swap +{} -{}", idx, swap_idx );
+				LOG( INFO ) << vm::fmt( "swap +{} -{}", idx, swap_idx );
 				present_idxs.erase( swap_idx );
 				auto uvec3_idx = uvec3( swap_idx.x, swap_idx.y, swap_idx.z );
 				auto &swap_vaddr = vaddr_buf[ uvec3_idx ];
@@ -272,7 +274,7 @@ RtBlockPagingServerImpl::RtBlockPagingServerImpl( RtBlockPagingServerOptions con
 				/* reset that block to lowest sample level */
 				swap_vaddr = basic_vaddr_buf[ uvec3_idx ];
 			} else {
-				throw logic_error( vm::fmt( "internal error: invalid state when transferring block {}", idx ) );
+				LOG( FATAL ) << vm::fmt( "internal error: invalid state when transferring block {}", idx );
 			}
 
 			auto storage_id = vaddr_id - lowest_blocks.size();
