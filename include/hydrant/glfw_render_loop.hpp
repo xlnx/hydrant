@@ -75,6 +75,7 @@ VM_EXPORT
 			glfwSetCursorPosCallback( window, glfw_cursor_pos_callback );
 			glfwSetMouseButtonCallback( window, glfw_mouse_button_callback );
 			glfwSetScrollCallback( window, glfw_scroll_callback );
+			glfwSetKeyCallback( window, glfw_key_callback );
 		}
 
 		void after_loop() override
@@ -82,6 +83,7 @@ VM_EXPORT
 			glfwSetCursorPosCallback( window, nullptr );
 			glfwSetMouseButtonCallback( window, nullptr );
 			glfwSetScrollCallback( window, nullptr );
+			glfwSetKeyCallback( window, nullptr );
 		}
 
 	public:
@@ -90,6 +92,8 @@ VM_EXPORT
 		virtual void on_cursor_pos( double xpos, double ypos ) {}
 
 		virtual void on_scroll( double xoffset, double yoffset ) {}
+
+		virtual void on_key( int key, int scancode, int action, int mods ) {}
 
 	private:
 		static void glfw_mouse_button_callback( GLFWwindow *window,
@@ -109,6 +113,12 @@ VM_EXPORT
 		{
 			auto self = reinterpret_cast<GlfwRenderLoop *>( glfwGetWindowUserPointer( window ) );
 			self->on_scroll( xoffset, yoffset );
+		}
+
+		static void glfw_key_callback( GLFWwindow *window, int key, int scancode, int action, int mods )
+		{
+			auto self = reinterpret_cast<GlfwRenderLoop *>( glfwGetWindowUserPointer( window ) );
+			self->on_key( key, scancode, action, mods );
 		}
 
 		void check_gl_error() const

@@ -74,6 +74,15 @@ struct DebGlfwRenderLoop : GlfwRenderLoop
 		orbit.arm.z = glm::clamp( orbit.arm.z, .1f, 10.f );
 	}
 
+	void on_key( int key, int scancode, int action, int mods ) override
+	{
+		if ( key == GLFW_KEY_SPACE && action == GLFW_PRESS ) {
+			auto writer = vm::json::Writer{}
+			                  .set_indent( 2 );
+			vm::println( "{}", writer.write( orbit ) );
+		}
+	}
+	
 	void post_frame() override
 	{
 		GlfwRenderLoop::post_frame();
