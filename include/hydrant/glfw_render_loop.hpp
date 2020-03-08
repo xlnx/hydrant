@@ -1,9 +1,10 @@
 #pragma once
 
-#include <VMUtils/json_binding.hpp>
-#include <hydrant/core/render_loop.hpp>
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
+#include <glog/logging.h>
+#include <VMUtils/json_binding.hpp>
+#include <hydrant/core/render_loop.hpp>
 
 VM_BEGIN_MODULE( hydrant )
 
@@ -114,8 +115,7 @@ VM_EXPORT
 		{
 			auto err = glGetError();
 			if ( err != GL_NO_ERROR ) {
-				vm::eprintln( "OpenGL Error {}: ", err );
-				exit( 1 );
+				LOG( FATAL ) << vm::fmt( "OpenGL Error {}: ", err );
 			}
 		}
 

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <regex>
+#include <glog/logging.h>
 #include <varch/thumbnail.hpp>
 #include <cudafx/device.hpp>
 #include <hydrant/bridge/image.hpp>
@@ -54,16 +55,15 @@ VM_EXPORT
 					for ( auto &device: devices ) {
 						auto props = device.props();
 						if ( std::regex_match( props.name, filter ) ) {
-							vm::println( "{}", props.name );
+							LOG( INFO ) << vm::fmt( "{}", props.name );
 						}
 					}
 					device = cufx::Device::get_default();
 					if ( !device.has_value() ) {
-						vm::println( "cuda device not found, fallback to cpu render mode" );
+						LOG( ERROR ) << vm::fmt( "cuda device not found, fallback to cpu render mode" );
 					}
 				} catch ( std::regex_error &e ) {
-					vm::eprintln( vm::fmt( "invalid regex: '{}'", params.device_filter ) );
-					exit( 1 );
+					LOG( FATAL ) << vm::fmt( "invalid regex: '{}'", params.device_filter );
 				}
 			}
 			shader.max_steps = params.max_steps;

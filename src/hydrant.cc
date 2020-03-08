@@ -113,6 +113,8 @@ struct OptReader
 
 int main( int argc, char **argv )
 {
+	google::InitGoogleLogging( argv[ 0 ] );
+	
 	cmdline::parser a;
 	a.add<string>( "in", 'i', "input directory", true );
 	a.add<string>( "out", 'o', "output filename", false );
