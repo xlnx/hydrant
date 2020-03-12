@@ -74,7 +74,11 @@ VM_EXPORT
 
 struct RendererRegistry
 {
-	static RendererRegistry instance;
+	static RendererRegistry &instance()
+	{
+		static RendererRegistry _;
+		return _;
+	}
 
 	std::map<std::string, std::function<IRenderer *()>> types;
 };
@@ -85,12 +89,12 @@ struct RendererRegistry
 #define REGISTER_RENDERER_UNIQ_HELPER( ctr, T, name ) \
 	REGISTER_RENDERER_UNIQ( ctr, T, name )
 
-#define REGISTER_RENDERER_UNIQ( ctr, T, name )                             \
-	static int                                                             \
-	  renderer_registrar__body__##ctr##__object =                          \
-		(                                                                  \
-		  ::hydrant::__inner__::RendererRegistry::instance.types[ name ] = \
-			[]() -> ::hydrant::IRenderer * { return new T; },              \
+#define REGISTER_RENDERER_UNIQ( ctr, T, name )                               \
+	static int                                                               \
+	  renderer_registrar__body__##ctr##__object =                            \
+		(                                                                    \
+		  ::hydrant::__inner__::RendererRegistry::instance().types[ name ] = \
+			[]() -> ::hydrant::IRenderer * { return new T; },                \
 		  0 )
 
 VM_END_MODULE()

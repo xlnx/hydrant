@@ -113,8 +113,8 @@ VM_EXPORT
 		template <typename F>
 		std::function<void( void * )> get_shading_device( ShadingDevice::_enumerated dev ) const
 		{
-			auto shader_meta = ShaderRegistry::instance.meta.find( typeid( F ) );
-			if ( shader_meta == ShaderRegistry::instance.meta.end() ) {
+			auto shader_meta = ShaderRegistry::instance().meta.find( typeid( F ) );
+			if ( shader_meta == ShaderRegistry::instance().meta.end() ) {
 				throw std::logic_error( "no such shader" );
 			}
 

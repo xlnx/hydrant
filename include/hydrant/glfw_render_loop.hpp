@@ -49,9 +49,14 @@ VM_EXPORT
 			return glfwWindowShouldClose( window );
 		}
 
+		void post_frame() override
+		{
+			glfwPollEvents();
+			glClear( GL_COLOR_BUFFER_BIT );
+		}
+
 		void on_frame( cufx::Image<> &frame ) override
 		{
-			glClear( GL_COLOR_BUFFER_BIT );
 			glDisable( GL_DEPTH_TEST );
 
 			glRasterPos2f( -1, 1 );
@@ -65,9 +70,12 @@ VM_EXPORT
 			check_gl_error();
 
 			glEnable( GL_DEPTH_TEST );
+		}
 
+		void after_frame() override
+		{
+			glfwMakeContextCurrent( window );
 			glfwSwapBuffers( window );
-			glfwPollEvents();
 		}
 
 		void post_loop() override
@@ -121,6 +129,7 @@ VM_EXPORT
 			self->on_key( key, scancode, action, mods );
 		}
 
+	protected:
 		void check_gl_error() const
 		{
 			auto err = glGetError();
@@ -132,7 +141,7 @@ VM_EXPORT
 	public:
 		const uvec2 resolution;
 
-	private:
+	protected:
 		GLFWwindow *window;
 	};
 }

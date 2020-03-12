@@ -42,6 +42,7 @@ VM_EXPORT
 			}
 			cons_frame_idx = 1 - cons_frame_idx;
 			display( frames[ cons_frame_idx ], cons_frame_idx );
+			loop.after_frame();
 			lk.unlock();
 			cv.notify_one();
 		}

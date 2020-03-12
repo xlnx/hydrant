@@ -9,7 +9,7 @@
 #include <VMUtils/timer.hpp>
 #include <VMUtils/cmdline.hpp>
 #include <hydrant/core/renderer.hpp>
-#include "deb_glfw_render_loop.hpp"
+#include "local_render_loop.hpp"
 
 using namespace std;
 using namespace vol;
@@ -58,7 +58,7 @@ struct OptReader
 int main( int argc, char **argv )
 {
 	google::InitGoogleLogging( argv[ 0 ] );
-	
+
 	cmdline::parser a;
 	a.add<string>( "in", 'i', "input directory", true );
 	a.add<string>( "out", 'o', "output filename", false );
@@ -95,7 +95,9 @@ int main( int argc, char **argv )
 					  .set_resolution( cfg.render.resolution.x,
 									   cfg.render.resolution.y )
 					  .set_title( "hydrant" );
-		DebGlfwRenderLoop loop( opts, cfg.camera );
+		LocalRenderLoop loop( opts, cfg.camera,
+							  cfg.render.renderer,
+							  cfg.render.params );
 		loop.orbit = *cfg.camera.orbit;
 
 		renderer->realtime_render(

@@ -1,7 +1,7 @@
 {
     "camera": {
         "orbit": {
-		    "arm": [
+            "arm": [
                 -182.109375,
                 -0.52734375,
                 2.00000023841858
@@ -13,8 +13,8 @@
     },
     "render": {
         "resolution": [
-            1024,
-            1024
+            512,
+            512
         ],
         "renderer": "Isosurface",
         "params": {

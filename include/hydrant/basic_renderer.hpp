@@ -52,7 +52,7 @@ VM_EXPORT
 				try {
 					std::regex filter( params.device_filter );
 					auto devices = cufx::Device::scan();
-					for ( auto &device: devices ) {
+					for ( auto &device : devices ) {
 						auto props = device.props();
 						if ( std::regex_match( props.name, filter ) ) {
 							LOG( INFO ) << vm::fmt( "{}", props.name );
@@ -123,6 +123,7 @@ VM_EXPORT
 				loop.post_frame();
 				auto frame = offline_render_ctxed( *pctx, loop.camera );
 				loop.on_frame( frame );
+				loop.after_frame();
 			}
 			loop.after_loop();
 		}
