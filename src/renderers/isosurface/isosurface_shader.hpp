@@ -20,6 +20,7 @@ VM_EXPORT
 		mat4 to_world;
 		vec3 eye_pos;
 		vec3 light_pos;
+		vec3 surface_color;
 		float isovalue;
 		Sampler chebyshev;
 		BlockPaging paging;

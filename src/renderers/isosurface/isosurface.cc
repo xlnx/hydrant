@@ -18,6 +18,7 @@ VM_EXPORT
 		if ( !Super::init( dataset, cfg ) ) { return false; }
 
 		auto params = cfg.params.get<IsosurfaceRendererConfig>();
+		shader.surface_color = params.surface_color;
 		shader.isovalue = params.isovalue;
 		shader.mode = params.mode;
 
