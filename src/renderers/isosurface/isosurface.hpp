@@ -24,6 +24,8 @@ VM_EXPORT
 		bool init( std::shared_ptr<Dataset> const &dataset,
 				   RendererConfig const &cfg ) override;
 
+		void update( vm::json::Any const &params ) override;
+
 	protected:
 		OfflineRenderCtx *create_offline_render_ctx() override;
 

@@ -17,11 +17,6 @@ VM_EXPORT
 	{
 		if ( !Super::init( dataset, cfg ) ) { return false; }
 
-		auto params = cfg.params.get<IsosurfaceRendererConfig>();
-		shader.surface_color = params.surface_color;
-		shader.isovalue = params.isovalue;
-		shader.mode = params.mode;
-
 		vm::println( "STEP = {}", shader.step );
 		vm::println( "MAX_STEPS = {}", shader.max_steps );
 		vm::println( "MARCH_DIST = {}", shader.max_steps * shader.step );
@@ -34,7 +29,17 @@ VM_EXPORT
 		chebyshev = create_texture( chebyshev_thumb );
 		shader.chebyshev = chebyshev.sampler();
 
+		update( cfg.params );
+
 		return true;
+	}
+
+	void IsosurfaceRenderer::update( vm::json::Any const &params_in )
+	{
+		auto params = params_in.get<IsosurfaceRendererConfig>();
+		shader.surface_color = params.surface_color;
+		shader.isovalue = params.isovalue;
+		shader.mode = params.mode;
 	}
 
 	struct IsosurfaceRenderCtx : OfflineRenderCtx

@@ -43,6 +43,8 @@ VM_EXPORT
 			return true;
 		}
 
+		virtual void update( vm::json::Any const &params ) {}
+
 		virtual cufx::Image<> offline_render( Camera const &camera ) = 0;
 
 		virtual void realtime_render( IRenderLoop &loop, RealtimeRenderOptions const &opts = RealtimeRenderOptions{} ) = 0;

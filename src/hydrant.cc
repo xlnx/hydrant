@@ -96,6 +96,7 @@ int main( int argc, char **argv )
 									   cfg.render.resolution.y )
 					  .set_title( "hydrant" );
 		LocalRenderLoop loop( opts, cfg.camera,
+							  *renderer,
 							  cfg.render.renderer,
 							  cfg.render.params );
 		loop.orbit = *cfg.camera.orbit;

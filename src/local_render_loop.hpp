@@ -11,10 +11,12 @@ VM_EXPORT
 	{
 		LocalRenderLoop( GlfwRenderLoopOptions const &opts,
 						 Camera const &camera,
-						 std::string const &renderer,
+						 IRenderer &renderer,
+						 std::string const &name,
 						 vm::json::Any &params ) :
 		  GlfwRenderLoop( opts, camera ),
-		  ui( UiFactory{}.create( renderer ) ),
+		  ui( UiFactory{}.create( name ) ),
+		  renderer( renderer ),
 		  params( params )
 		{
 		}
@@ -99,13 +101,14 @@ VM_EXPORT
 			ImGui_ImplGlfw_NewFrame();
 			ImGui::NewFrame();
 
-			bool my_tool_active;
-			ImGui::Begin( "My First Tool", &my_tool_active, ImGuiWindowFlags_MenuBar );
+			ImGui::Begin( "Renderer Config" );
 			ui->render( params );
 			ImGui::End();
 
 			ImGui::Render();
 			ImGui_ImplOpenGL2_RenderDrawData( ImGui::GetDrawData() );
+
+			renderer.update( params );
 
 			frames += 1;
 			auto time = glfwGetTime();
@@ -120,6 +123,7 @@ VM_EXPORT
 
 	public:
 		vm::Box<IUi> ui;
+		IRenderer &renderer;
 		vm::json::Any &params;
 		double prev = NAN;
 		int frames = 0;
