@@ -1,23 +1,65 @@
 #pragma once
 
+#include <hydrant/core/renderer.hpp>
 #include <hydrant/glfw_render_loop.hpp>
 #include <hydrant/ui.hpp>
 
 VM_BEGIN_MODULE( hydrant )
 
+struct Fbo
+{
+	Fbo( uvec2 const &resolution )
+	{
+		glGenTextures( 1, &tex );
+		glBindTexture( GL_TEXTURE_2D, tex );
+		glTexImage2D( GL_TEXTURE_2D, 0, GL_RGB, resolution.x, resolution.y,
+					  0, GL_RGB, GL_UNSIGNED_BYTE, 0 );
+		glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST );
+		glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST );
+		glBindTexture( GL_TEXTURE_2D, 0 );
+
+		glGenFramebuffersEXT( 1, &_ );
+		bind();
+		glFramebufferTexture2DEXT( GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT,
+								   GL_TEXTURE_2D, tex, 0 );
+		unbind();
+	}
+
+	void bind() const
+	{
+		glBindFramebufferEXT( GL_FRAMEBUFFER_EXT, _ );
+	}
+
+	void unbind() const
+	{
+		glBindFramebufferEXT( GL_FRAMEBUFFER_EXT, 0 );		
+	}
+
+	GLuint texture() const { return tex; }
+	
+private:
+	GLuint _ = 0;
+	GLuint tex = 0;
+};
+
 VM_EXPORT
 {
+	struct Config : vm::json::Serializable<Config>
+	{
+		VM_JSON_FIELD( CameraConfig, camera );
+		VM_JSON_FIELD( RendererConfig, render );
+	};
+
 	struct LocalRenderLoop : GlfwRenderLoop
 	{
 		LocalRenderLoop( GlfwRenderLoopOptions const &opts,
-						 Camera const &camera,
-						 IRenderer &renderer,
-						 std::string const &name,
-						 vm::json::Any &params ) :
-		  GlfwRenderLoop( opts, camera ),
-		  ui( UiFactory{}.create( name ) ),
-		  renderer( renderer ),
-		  params( params )
+						 Config &cfg,
+						 IRenderer &renderer ) :
+		  GlfwRenderLoop( opts, cfg.camera ),
+		  ui( UiFactory{}.create( cfg.render.renderer ) ),
+		  //		  fbo( new Fbo( cfg.render.resolution ) ),
+		  config( cfg ),
+		  renderer( renderer )
 		{
 		}
 
@@ -31,8 +73,6 @@ VM_EXPORT
 
 			IMGUI_CHECKVERSION();
 			ImGui::CreateContext();
-			ImGuiIO &io = ImGui::GetIO();
-			(void)io;
 			//io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
 			//io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
 
@@ -56,8 +96,13 @@ VM_EXPORT
 
 		void on_mouse_button( int button, int action, int mode ) override
 		{
+			ImGuiIO &io = ImGui::GetIO();
 			if ( button == GLFW_MOUSE_BUTTON_LEFT ) {
-				trackball_rec = action == GLFW_PRESS;
+				if ( io.WantCaptureMouse ) {
+					trackball_rec = false;
+				} else {
+					trackball_rec = action == GLFW_PRESS;
+				}
 			}
 		}
 
@@ -95,20 +140,7 @@ VM_EXPORT
 
 		void on_frame( cufx::Image<> &frame ) override
 		{
-			GlfwRenderLoop::on_frame( frame );
-
-			ImGui_ImplOpenGL2_NewFrame();
-			ImGui_ImplGlfw_NewFrame();
-			ImGui::NewFrame();
-
-			ImGui::Begin( "Renderer Config" );
-			ui->render( params );
-			ImGui::End();
-
-			ImGui::Render();
-			ImGui_ImplOpenGL2_RenderDrawData( ImGui::GetDrawData() );
-
-			renderer.update( params );
+			ui_main( frame );
 
 			frames += 1;
 			auto time = glfwGetTime();
@@ -120,11 +152,87 @@ VM_EXPORT
 				prev = time;
 			}
 		}
+		
+	private:
+		void ui_main( cufx::Image<> &frame )
+		{
+			ImGui_ImplOpenGL2_NewFrame();
+			ImGui_ImplGlfw_NewFrame();
+			ImGui::NewFrame();
+			
+			ui_toolbar_window();
+			ui_viewport_window( frame );
+			
+			ImGui::Render();
+			ImGui_ImplOpenGL2_RenderDrawData( ImGui::GetDrawData() );
+		}
+
+		void ui_toolbar_window()
+		{
+			ImGui::Begin( "Renderer", nullptr, ImGuiWindowFlags_AlwaysAutoResize );
+
+			ui_camera_bar();
+			ui_renderer_bar();
+
+			ImGui::End();
+		}
+
+		void ui_viewport_window( cufx::Image<> &frame )
+		{
+			auto &res = config.render.resolution;
+			ImGui::SetNextWindowSize( ImVec2( res.x + 10,
+											  res.y + 10 ) );
+			ImGui::Begin( "Viewport" );
+			auto pos = ImGui::GetCursorScreenPos();
+			
+			// fbo->bind();
+
+			GLint vp[ 4 ];
+			glGetIntegerv( GL_VIEWPORT, vp );
+			glViewport( 0, 0, res.x, res.y );
+			//GlfwRenderLoop::on_frame( frame );
+			glViewport( vp[0], vp[1], vp[2], vp[3] );
+
+			// fbo->unbind();
+
+			//ImGui::GetWindowDrawList()->AddImage( (ImTextureID)fbo->texture(),
+			//									  ImVec2( ImGui::GetItemRectMin().x + pos.x,
+			//											  ImGui::GetItemRectMin().y + pos.y ),
+			//									  ImVec2( 1024, 1024 ) );
+			
+			ImGui::End();
+		}
+
+		void ui_camera_bar()
+		{
+			if ( !ImGui::CollapsingHeader( "Camera",
+										   ImGuiTreeNodeFlags_DefaultOpen ) ) return;
+
+			vec3 arm = orbit.arm;
+			arm.x = radians( arm.x );
+			arm.y = radians( arm.y );
+			ImGui::SliderAngle( "Yaw", &arm.x, -180, 180 );
+			ImGui::SliderAngle( "Pitch", &arm.y, -89, 89 );
+			ImGui::SliderFloat( "Distance", &arm.z, 0.1, 3.2 );
+			arm.x = degrees( arm.x );
+			arm.y = degrees( arm.y );
+			orbit.arm = arm;
+		}
+
+		void ui_renderer_bar()
+		{
+			if ( !ImGui::CollapsingHeader( config.render.renderer.c_str(),
+										   ImGuiTreeNodeFlags_DefaultOpen ) ) return;
+			
+			ui->render( config.render.params );
+			renderer.update( config.render.params );
+		}
 
 	public:
 		vm::Box<IUi> ui;
+		// vm::Box<Fbo> fbo;
+		Config &config;
 		IRenderer &renderer;
-		vm::json::Any &params;
 		double prev = NAN;
 		int frames = 0;
 		bool trackball_rec = false;

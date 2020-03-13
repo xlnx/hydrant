@@ -8,7 +8,7 @@ struct IsosurfaceUi : IUiTyped<IsosurfaceRendererConfig>
 	void render_typed( IsosurfaceRendererConfig &config ) override
 	{
 		ImGui::ColorEdit3( "Surface Color", reinterpret_cast<float *>( &config.surface_color.data ) );
-		ImGui::DragFloat( "Isovalue", &config.isovalue, 0.05, 0.f, 1.f );
+		ImGui::SliderFloat( "Isovalue", &config.isovalue, 0.f, 1.f );
 	}
 };
 

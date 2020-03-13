@@ -8,7 +8,6 @@
 #include <VMUtils/fmt.hpp>
 #include <VMUtils/timer.hpp>
 #include <VMUtils/cmdline.hpp>
-#include <hydrant/core/renderer.hpp>
 #include "local_render_loop.hpp"
 
 using namespace std;
@@ -39,12 +38,6 @@ inline void ensure_file( std::string const &path_v )
 								 path_v );
 	}
 }
-
-struct Config : vm::json::Serializable<Config>
-{
-	VM_JSON_FIELD( CameraConfig, camera );
-	VM_JSON_FIELD( RendererConfig, render );
-};
 
 template <typename Enum>
 struct OptReader
@@ -92,13 +85,9 @@ int main( int argc, char **argv )
 		renderer->offline_render( cfg.camera ).dump( out.resolved() );
 	} else {
 		auto opts = GlfwRenderLoopOptions{}
-					  .set_resolution( cfg.render.resolution.x,
-									   cfg.render.resolution.y )
+					  .set_resolution( 1280, 768 )
 					  .set_title( "hydrant" );
-		LocalRenderLoop loop( opts, cfg.camera,
-							  *renderer,
-							  cfg.render.renderer,
-							  cfg.render.params );
+		LocalRenderLoop loop( opts, cfg, *renderer );
 		loop.orbit = *cfg.camera.orbit;
 
 		renderer->realtime_render(
