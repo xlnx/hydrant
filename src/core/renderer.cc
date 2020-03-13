@@ -1,3 +1,4 @@
+#include <glog/logging.h>
 #include <hydrant/core/renderer.hpp>
 
 VM_BEGIN_MODULE( hydrant )
@@ -10,7 +11,7 @@ VM_EXPORT
 		  [&]() -> IRenderer * {
 			  auto pr = RendererRegistry::instance().types.find( cfg.renderer );
 			  if ( pr == RendererRegistry::instance().types.end() ) {
-				  throw std::logic_error( vm::fmt( "unknown renderer '{}'", cfg.renderer ) );
+				  LOG( FATAL ) << vm::fmt( "unknown renderer '{}'", cfg.renderer );
 			  }
 			  return pr->second();
 		  }() );

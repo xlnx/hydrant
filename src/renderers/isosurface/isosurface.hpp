@@ -9,7 +9,7 @@ VM_BEGIN_MODULE( hydrant )
 
 VM_EXPORT
 {
-	struct IsosurfaceRendererConfig : vm::json::Serializable<IsosurfaceRendererConfig>
+	struct IsosurfaceRendererParams : vm::json::Serializable<IsosurfaceRendererParams>
 	{
 		VM_JSON_FIELD( IsosurfaceRenderMode, mode ) = IsosurfaceRenderMode::Color;
 		VM_JSON_FIELD( vec3, surface_color ) = { 1.f, 1.f, 1.f };

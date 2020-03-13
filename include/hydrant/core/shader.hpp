@@ -5,6 +5,7 @@
 #include <functional>
 #include <typeindex>
 #include <typeinfo>
+#include <glog/logging.h>
 #include <VMUtils/enum.hpp>
 #include <hydrant/core/glm_math.hpp>
 #include <cudafx/kernel.hpp>
@@ -323,8 +324,7 @@ struct ShaderRegistrar
 	int build()
 	{
 		if ( ShaderRegistry::instance().meta.count( _type_index ) ) {
-			throw std::logic_error(
-			  vm::fmt( "shader '{}' already registered", _meta.class_name ) );
+			LOG( FATAL ) << vm::fmt( "shader '{}' already registered", _meta.class_name );
 		}
 		ShaderRegistry::instance().meta[ _type_index ] = std::move( _meta );
 		return 0;

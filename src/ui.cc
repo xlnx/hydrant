@@ -3,6 +3,12 @@
 
 VM_BEGIN_MODULE( hydrant )
 
+struct EmptyUi : IUi
+{
+	void render( vm::json::Any &e ) override {}
+	void render_impl( void *data ) override {}
+};
+
 VM_EXPORT
 {
 	vm::Box<IUi> UiFactory::create( std::string const &name )
@@ -11,7 +17,7 @@ VM_EXPORT
 		  [&]() -> IUi * {
 			  auto pr = UiRegistry::instance().types.find( name );
 			  if ( pr == UiRegistry::instance().types.end() ) {
-				  throw std::logic_error( vm::fmt( "unknown ui '{}'", name ) );
+				  return new EmptyUi;
 			  }
 			  return pr->second();
 		  }() );

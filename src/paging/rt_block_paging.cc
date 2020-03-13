@@ -135,7 +135,7 @@ void RtBlockPagingServerImpl::unarchive_lowest_level()
 	auto nblk_x = ( 1 << level ) * arch.block_size;
 	auto nblk_y = lvl0_arch->block_size;
 	if ( nblk_x % nblk_y != 0 ) {
-		throw logic_error( "nblk_x % nblk_y != 0" );
+		LOG( FATAL ) << "nblk_x % nblk_y != 0";
 	}
 
 	auto nblk_scale = nblk_x / nblk_y;
@@ -241,7 +241,7 @@ RtBlockPagingServerImpl::RtBlockPagingServerImpl( RtBlockPagingServerOptions con
 	auto block_bytes = pad_bs * pad_bs * pad_bs;
 	max_block_count = mem_limit_bytes / block_bytes;
 	max_block_count = std::min( max_block_count, MAX_SAMPLER_COUNT - lowest_blocks.size() );
-	
+
 	LOG( INFO ) << vm::fmt( "MEM_LIMIT_BYTES = {}", mem_limit_bytes );
 	LOG( INFO ) << vm::fmt( "BLOCK_BYTES = {}", block_bytes );
 	LOG( INFO ) << vm::fmt( "MAX_BLOCK_COUNT = {}", max_block_count );

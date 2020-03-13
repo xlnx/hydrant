@@ -6,6 +6,7 @@
 #include <VMUtils/json_binding.hpp>
 #include <hydrant/ui.hpp>
 #include <hydrant/glfw_render_loop.hpp>
+#include <hydrant/basic_renderer.hpp>
 #include <hydrant/application.hpp>
 
 VM_BEGIN_MODULE( hydrant )
@@ -306,12 +307,9 @@ public:
 
 		// ui_toolbar_window();
 		// ui_viewport_window( frame );
-		auto bg = ImGui::GetStyleColorVec4( ImGuiCol_WindowBg );
-		nlohmann::json param_update = { { "clear_color", vec3( bg.x, bg.y, bg.z ) } };
 		hov_vp = nullptr;
 		for ( auto &vp : viewports ) {
 			vp->poll();
-			vp->config.render.params.update( param_update );
 			if ( vp->active ) { act_vp = vp.get(); }
 			if ( vp->hovered ) { hov_vp = vp.get(); }
 		}
@@ -343,19 +341,21 @@ public:
 		}
 
 		ImGui::Begin( "Properties" );
+
 		if ( act_vp ) {
-			ui_camera_bar( *act_vp );
-			ui_renderer_bar( *act_vp );
+			ui_camera_bar();
+			ui_renderer_bar();
 		}
+
 		ImGui::End();
 	}
 
-	void ui_camera_bar( Viewport &vp )
+	void ui_camera_bar()
 	{
 		if ( !ImGui::CollapsingHeader( "Camera",
 									   ImGuiTreeNodeFlags_DefaultOpen ) ) return;
 
-		vec3 arm = vp.orbit.arm;
+		vec3 arm = act_vp->orbit.arm;
 		arm.x = radians( arm.x );
 		arm.y = radians( arm.y );
 		ImGui::SliderAngle( "Yaw", &arm.x, -180, 180 );
@@ -363,17 +363,27 @@ public:
 		ImGui::SliderFloat( "Distance", &arm.z, 0.1, 3.2 );
 		arm.x = degrees( arm.x );
 		arm.y = degrees( arm.y );
-		vp.orbit.arm = arm;
-		vp.camera.update_params( vp.orbit );
+		act_vp->orbit.arm = arm;
+		act_vp->camera.update_params( act_vp->orbit );
 	}
 
-	void ui_renderer_bar( Viewport &vp )
+	void ui_renderer_bar()
 	{
-		if ( !ImGui::CollapsingHeader( vp.config.render.renderer.c_str(),
-									   ImGuiTreeNodeFlags_DefaultOpen ) ) return;
-
-		vp.ctrl_ui->render( vp.config.render.params );
-		vp.renderer->update( vp.config.render.params );
+		if ( ImGui::CollapsingHeader( "Basic", ImGuiTreeNodeFlags_DefaultOpen ) ) {
+			auto params = act_vp->config.render.params.get<BasicRendererParams>();
+			ImGui::InputInt( "Max Steps", &params.max_steps );
+			ImGui::ColorEdit3( "Background", reinterpret_cast<float *>( &params.clear_color.data ) );
+			if ( ImGui::Button( "Use Window Background" ) ) {
+				auto bg = ImGui::GetStyleColorVec4( ImGuiCol_WindowBg );
+				params.clear_color = vec3( bg.x, bg.y, bg.z );
+			}
+			act_vp->config.render.params.update( params );
+		}
+		if ( ImGui::CollapsingHeader( act_vp->config.render.renderer.c_str(),
+									  ImGuiTreeNodeFlags_DefaultOpen ) ) {
+			act_vp->ctrl_ui->render( act_vp->config.render.params );
+		}
+		act_vp->renderer->update( act_vp->config.render.params );
 	}
 
 private:
@@ -381,28 +391,34 @@ private:
 	{
 		ImGuiIO &io = ImGui::GetIO();
 		if ( button == GLFW_MOUSE_BUTTON_LEFT ) {
-			if ( io.WantCaptureMouse && hov_vp ) {
-				trackball_rec = action == GLFW_PRESS;
+			if ( io.WantCaptureMouse && hov_vp && action == GLFW_PRESS ) {
+				trackball_rec = true;
+			} else if ( action == GLFW_RELEASE ) {
+				trackball_rec = false;
 			}
 		}
 	}
 
 	void on_cursor_pos( double x1, double y1 ) override
 	{
-		if ( trackball_rec ) {
-			act_vp->orbit.arm.x += -( x1 - x0 ) / resolution.x * 90;
-			act_vp->orbit.arm.y += ( y1 - y0 ) / resolution.y * 90;
-			act_vp->orbit.arm.y = glm::clamp( act_vp->orbit.arm.y, -90.f, 90.f );
+		if ( act_vp ) {
+			if ( trackball_rec ) {
+				act_vp->orbit.arm.x += -( x1 - x0 ) / resolution.x * 90;
+				act_vp->orbit.arm.y += ( y1 - y0 ) / resolution.y * 90;
+				act_vp->orbit.arm.y = glm::clamp( act_vp->orbit.arm.y, -90.f, 90.f );
+			}
+			x0 = x1;
+			y0 = y1;
 		}
-		x0 = x1;
-		y0 = y1;
 	}
 
-	// 	void on_scroll( double dx, double dy ) override
-	// 	{
-	// 		orbit.arm.z += dy * ( -1e-1 );
-	// 		orbit.arm.z = glm::clamp( orbit.arm.z, .1f, 10.f );
-	// 	}
+	void on_scroll( double dx, double dy ) override
+	{
+		if ( hov_vp ) {
+			hov_vp->orbit.arm.z += dy * ( -5e-2 );
+			hov_vp->orbit.arm.z = glm::clamp( hov_vp->orbit.arm.z, .1f, 3.f );
+		}
+	}
 
 	// 	void on_key( int key, int scancode, int action, int mods ) override
 	// 	{
@@ -410,29 +426,6 @@ private:
 	// 			auto writer = vm::json::Writer{}
 	// 							.set_indent( 2 );
 	// 			vm::println( "{}", writer.write( orbit ) );
-	// 		}
-	// 	}
-
-	// 	void post_frame() override
-	// 	{
-	// 		GlfwRenderLoop::post_frame();
-	// 		camera.update_params( orbit );
-	// 	}
-
-	// 	void on_frame( cufx::Image<> &frame ) override
-	// 	{
-	// 		// GlfwRenderLoop::on_frame( frame );
-	// 		glClear( GL_COLOR_BUFFER_BIT );
-	// 		ui_main( frame );
-
-	// 		nframes += 1;
-	// 		auto time = glfwGetTime();
-	// 		if ( isnan( prev ) ) {
-	// 			prev = time;
-	// 		} else if ( time - prev >= 1.0 ) {
-	// 			vm::println( "fps: {}", nframes );
-	// 			nframes = 0;
-	// 			prev = time;
 	// 		}
 	// 	}
 

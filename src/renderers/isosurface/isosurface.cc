@@ -38,10 +38,10 @@ VM_EXPORT
 	{
 		Super::update( params_in );
 
-		auto params = params_in.get<IsosurfaceRendererConfig>();
+		auto params = params_in.get<IsosurfaceRendererParams>();
+		shader.mode = params.mode;
 		shader.surface_color = params.surface_color;
 		shader.isovalue = params.isovalue;
-		shader.mode = params.mode;
 	}
 
 	struct IsosurfaceRenderCtx : OfflineRenderCtx

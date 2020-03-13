@@ -18,7 +18,7 @@ VM_EXPORT
 	{
 		if ( !Super::init( dataset, cfg ) ) { return false; }
 
-		auto params = cfg.params.get<VolumeRendererConfig>();
+		auto params = cfg.params.get<VolumeRendererParams>();
 		// shader.render_mode = params.mode == "volume" ? BrmVolume : BrmSolid;
 		shader.density = params.density;
 		transfer_fn = TransferFn( params.transfer_fn, device );
@@ -33,6 +33,16 @@ VM_EXPORT
 		shader.chebyshev = chebyshev.sampler();
 
 		return true;
+	}
+
+	void VolumeRenderer::update( vm::json::Any const &params_in )
+	{
+		Super::update( params_in );
+
+		auto params = params_in.get<VolumeRendererParams>();
+		// shader.mode = params.mode;
+		// shader.surface_color = params.surface_color;
+		shader.density = params.density;
 	}
 
 	struct VolumeOfflineRenderCtx : OfflineRenderCtx
