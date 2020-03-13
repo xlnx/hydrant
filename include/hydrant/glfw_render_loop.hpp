@@ -1,9 +1,10 @@
 #pragma once
 
-#include <VMUtils/json_binding.hpp>
-#include <hydrant/core/render_loop.hpp>
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
+#include <glog/logging.h>
+#include <VMUtils/json_binding.hpp>
+#include <hydrant/core/render_loop.hpp>
 
 VM_BEGIN_MODULE( hydrant )
 
@@ -26,7 +27,7 @@ VM_EXPORT
 
 			glfwWindowHint( GLFW_CONTEXT_VERSION_MAJOR, 2 );
 			glfwWindowHint( GLFW_CONTEXT_VERSION_MINOR, 0 );
-			glfwWindowHint( GLFW_RESIZABLE, GLFW_FALSE );
+			// glfwWindowHint( GLFW_RESIZABLE, GLFW_FALSE );
 			// glfwWindowHint( GLFW_OPENGL_PROFILE, GLFW_OPENGL_COMPAT_PROFILE );
 
 			window = glfwCreateWindow( resolution.x, resolution.y,
@@ -48,9 +49,14 @@ VM_EXPORT
 			return glfwWindowShouldClose( window );
 		}
 
+		void post_frame() override
+		{
+			glfwPollEvents();
+			glClear( GL_COLOR_BUFFER_BIT );
+		}
+
 		void on_frame( cufx::Image<> &frame ) override
 		{
-			glClear( GL_COLOR_BUFFER_BIT );
 			glDisable( GL_DEPTH_TEST );
 
 			glRasterPos2f( -1, 1 );
@@ -64,9 +70,12 @@ VM_EXPORT
 			check_gl_error();
 
 			glEnable( GL_DEPTH_TEST );
+		}
 
+		void after_frame() override
+		{
+			glfwMakeContextCurrent( window );
 			glfwSwapBuffers( window );
-			glfwPollEvents();
 		}
 
 		void post_loop() override
@@ -74,6 +83,7 @@ VM_EXPORT
 			glfwSetCursorPosCallback( window, glfw_cursor_pos_callback );
 			glfwSetMouseButtonCallback( window, glfw_mouse_button_callback );
 			glfwSetScrollCallback( window, glfw_scroll_callback );
+			glfwSetKeyCallback( window, glfw_key_callback );
 		}
 
 		void after_loop() override
@@ -81,6 +91,7 @@ VM_EXPORT
 			glfwSetCursorPosCallback( window, nullptr );
 			glfwSetMouseButtonCallback( window, nullptr );
 			glfwSetScrollCallback( window, nullptr );
+			glfwSetKeyCallback( window, nullptr );
 		}
 
 	public:
@@ -89,6 +100,8 @@ VM_EXPORT
 		virtual void on_cursor_pos( double xpos, double ypos ) {}
 
 		virtual void on_scroll( double xoffset, double yoffset ) {}
+
+		virtual void on_key( int key, int scancode, int action, int mods ) {}
 
 	private:
 		static void glfw_mouse_button_callback( GLFWwindow *window,
@@ -110,19 +123,25 @@ VM_EXPORT
 			self->on_scroll( xoffset, yoffset );
 		}
 
+		static void glfw_key_callback( GLFWwindow *window, int key, int scancode, int action, int mods )
+		{
+			auto self = reinterpret_cast<GlfwRenderLoop *>( glfwGetWindowUserPointer( window ) );
+			self->on_key( key, scancode, action, mods );
+		}
+
+	protected:
 		void check_gl_error() const
 		{
 			auto err = glGetError();
 			if ( err != GL_NO_ERROR ) {
-				vm::eprintln( "OpenGL Error {}: ", err );
-				exit( 1 );
+				LOG( FATAL ) << vm::fmt( "OpenGL Error {}: ", err );
 			}
 		}
 
 	public:
 		const uvec2 resolution;
 
-	private:
+	protected:
 		GLFWwindow *window;
 	};
 }

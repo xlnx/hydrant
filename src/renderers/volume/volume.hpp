@@ -7,7 +7,7 @@ VM_BEGIN_MODULE( hydrant )
 
 VM_EXPORT
 {
-	struct VolumeRendererConfig : vm::json::Serializable<VolumeRendererConfig>
+	struct VolumeRendererParams : vm::json::Serializable<VolumeRendererParams>
 	{
 		VM_JSON_FIELD( TransferFnConfig, transfer_fn );
 		VM_JSON_FIELD( float, density ) = 1e-2f;
@@ -21,9 +21,14 @@ VM_EXPORT
 		bool init( std::shared_ptr<Dataset> const &dataset,
 				   RendererConfig const &cfg ) override;
 
-		cufx::Image<> offline_render( Camera const &camera ) override;
+		void update( vm::json::Any const &params_in ) override;
 
-		void render_loop( IRenderLoop &loop ) override;
+	protected:
+		OfflineRenderCtx *create_offline_render_ctx() override;
+
+		cufx::Image<> offline_render_ctxed( OfflineRenderCtx &ctx, Camera const &camera ) override;
+
+		void realtime_render_dynamic( IRenderLoop &loop ) override;
 
 	private:
 		TransferFn transfer_fn;

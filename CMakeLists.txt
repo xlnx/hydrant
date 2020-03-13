@@ -27,6 +27,14 @@ vm_external_module(
   GIT_REPOSITORY https://github.com/cad420/glm-cuda
   GIT_TAG        master
 )
+vm_external_module(
+  GIT_REPOSITORY https://github.com/xlnx/glog
+  GIT_TAG        master
+)
+vm_external_module(
+  GIT_REPOSITORY https://github.com/xlnx/imgui-gl
+  GIT_TAG        master
+)
 
 find_package(CUDA REQUIRED)
 set(CUDA_ATTACH_VS_BUILD_RULE_TO_CUDA_FILE ON)

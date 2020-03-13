@@ -26,6 +26,14 @@ VM_EXPORT
 		VM_JSON_FIELD( vm::json::Any, params ) = vm::json::Any();
 	};
 
+	VM_ENUM( RealtimeRenderQuality,
+			 Lossless, Dynamic );
+
+	struct RealtimeRenderOptions : vm::json::Serializable<RealtimeRenderOptions>
+	{
+		VM_JSON_FIELD( RealtimeRenderQuality, quality ) = RealtimeRenderQuality::Dynamic;
+	};
+
 	struct IRenderer : vm::Dynamic
 	{
 		virtual bool init( std::shared_ptr<Dataset> const &dataset, RendererConfig const &cfg )
@@ -35,18 +43,11 @@ VM_EXPORT
 			return true;
 		}
 
+		virtual void update( vm::json::Any const &params ) {}
+
 		virtual cufx::Image<> offline_render( Camera const &camera ) = 0;
 
-		virtual void render_loop( IRenderLoop &loop )
-		{
-			loop.post_loop();
-			while ( !loop.should_stop() ) {
-				loop.post_frame();
-				auto frame = offline_render( loop.camera );
-				loop.on_frame( frame );
-			}
-			loop.after_loop();
-		}
+		virtual void realtime_render( IRenderLoop &loop, RealtimeRenderOptions const &opts = RealtimeRenderOptions{} ) = 0;
 
 	protected:
 		std::shared_ptr<Dataset> dataset;
@@ -75,7 +76,11 @@ VM_EXPORT
 
 struct RendererRegistry
 {
-	static RendererRegistry instance;
+	static RendererRegistry &instance()
+	{
+		static RendererRegistry _;
+		return _;
+	}
 
 	std::map<std::string, std::function<IRenderer *()>> types;
 };
@@ -86,12 +91,12 @@ struct RendererRegistry
 #define REGISTER_RENDERER_UNIQ_HELPER( ctr, T, name ) \
 	REGISTER_RENDERER_UNIQ( ctr, T, name )
 
-#define REGISTER_RENDERER_UNIQ( ctr, T, name )                             \
-	static int                                                             \
-	  renderer_registrar__body__##ctr##__object =                          \
-		(                                                                  \
-		  ::hydrant::__inner__::RendererRegistry::instance.types[ name ] = \
-			[]() -> ::hydrant::IRenderer * { return new T; },              \
+#define REGISTER_RENDERER_UNIQ( ctr, T, name )                               \
+	static int                                                               \
+	  renderer_registrar__body__##ctr##__object =                            \
+		(                                                                    \
+		  ::hydrant::__inner__::RendererRegistry::instance().types[ name ] = \
+			[]() -> ::hydrant::IRenderer * { return new T; },                \
 		  0 )
 
 VM_END_MODULE()

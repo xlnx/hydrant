@@ -1,5 +1,7 @@
 #pragma once
 
+#include <regex>
+#include <glog/logging.h>
 #include <varch/thumbnail.hpp>
 #include <cudafx/device.hpp>
 #include <hydrant/bridge/image.hpp>
@@ -28,8 +30,13 @@ VM_EXPORT
 	struct BasicRendererParams : vm::json::Serializable<BasicRendererParams>
 	{
 		VM_JSON_FIELD( ShadingDevice, device ) = ShadingDevice::Cuda;
+		VM_JSON_FIELD( std::string, device_filter ) = ".*";
 		VM_JSON_FIELD( int, max_steps ) = 500;
 		VM_JSON_FIELD( vec3, clear_color ) = vec3( 0 );
+	};
+
+	struct OfflineRenderCtx : vm::Dynamic
+	{
 	};
 
 	template <typename Shader>
@@ -42,9 +49,21 @@ VM_EXPORT
 
 			auto params = cfg.params.get<BasicRendererParams>();
 			if ( params.device == ShadingDevice::Cuda ) {
-				device = cufx::Device::get_default();
-				if ( !device.has_value() ) {
-					vm::println( "cuda device not found, fallback to cpu render mode" );
+				try {
+					std::regex filter( params.device_filter );
+					auto devices = cufx::Device::scan();
+					for ( auto &device : devices ) {
+						auto props = device.props();
+						if ( std::regex_match( props.name, filter ) ) {
+							LOG( INFO ) << vm::fmt( "{}", props.name );
+						}
+					}
+					device = cufx::Device::get_default();
+					if ( !device.has_value() ) {
+						LOG( ERROR ) << vm::fmt( "cuda device not found, fallback to cpu render mode" );
+					}
+				} catch ( std::regex_error &e ) {
+					LOG( FATAL ) << vm::fmt( "invalid regex: '{}'", params.device_filter );
 				}
 			}
 			shader.max_steps = params.max_steps;
@@ -65,10 +84,60 @@ VM_EXPORT
 						.set_size( f_dim );
 
 			shader.bbox = Box3D{ { 0, 0, 0 }, f_dim };
-			shader.step = 1.f / lvl0_blksz;
+			shader.step = .3f / lvl0_blksz;
 
 			return true;
 		}
+
+		void update( vm::json::Any const &params_in ) override
+		{
+			auto params = params_in.get<BasicRendererParams>();
+			shader.max_steps = params.max_steps;
+			clear_color = params.clear_color;
+		}
+
+	public:
+		cufx::Image<> offline_render( Camera const &camera ) override final
+		{
+			std::unique_ptr<OfflineRenderCtx> pctx( create_offline_render_ctx() );
+			return offline_render_ctxed( *pctx, camera );
+		}
+
+	protected:
+		virtual cufx::Image<> offline_render_ctxed( OfflineRenderCtx &ctx, Camera const &camera ) = 0;
+
+		virtual OfflineRenderCtx *create_offline_render_ctx() { return new OfflineRenderCtx; }
+
+	public:
+		void realtime_render( IRenderLoop &loop, RealtimeRenderOptions const &opts ) override final
+		{
+			switch ( opts.quality._to_integral() ) {
+			case RealtimeRenderQuality::Lossless: {
+				realtime_render_lossless( loop );
+			} break;
+			case RealtimeRenderQuality::Dynamic: {
+				realtime_render_dynamic( loop );
+			} break;
+			}
+		}
+
+	protected:
+		void realtime_render_default( IRenderLoop &loop )
+		{
+			std::unique_ptr<OfflineRenderCtx> pctx( create_offline_render_ctx() );
+			loop.post_loop();
+			while ( !loop.should_stop() ) {
+				loop.post_frame();
+				auto frame = offline_render_ctxed( *pctx, loop.camera );
+				loop.on_frame( frame );
+				loop.after_frame();
+			}
+			loop.after_loop();
+		}
+
+		virtual void realtime_render_lossless( IRenderLoop &loop ) { realtime_render_default( loop ); }
+
+		virtual void realtime_render_dynamic( IRenderLoop &loop ) { realtime_render_default( loop ); }
 
 	public:
 		template <typename T>

@@ -5,6 +5,7 @@
 #include <hydrant/core/renderer.hpp>
 #include <hydrant/bridge/sampler.hpp>
 #include <hydrant/octree_culler.hpp>
+#include <hydrant/paging/block_paging.hpp>
 
 VM_BEGIN_MODULE( hydrant )
 
@@ -12,41 +13,6 @@ struct RtBlockPagingServerImpl;
 
 VM_EXPORT
 {
-	struct BlockSamplerMapping
-	{
-		__host__ __device__ vec3
-		  mapped( vec3 const &x ) const
-		{
-			return k * x + b;
-		}
-
-	public:
-		VM_DEFINE_ATTRIBUTE( float, k );
-		VM_DEFINE_ATTRIBUTE( vec3, b );
-	};
-
-	struct BlockSampler
-	{
-		template <typename T>
-		__host__ __device__ T
-		  sample_3d( vec3 const &x ) const
-		{
-			return sampler.sample_3d<T>( mapping.mapped( x ) );
-		}
-
-	public:
-		VM_DEFINE_ATTRIBUTE( Sampler, sampler );
-		VM_DEFINE_ATTRIBUTE( BlockSamplerMapping, mapping );
-	};
-
-	struct RtBlockPagingClient
-	{
-	public:
-		Sampler vaddr;
-		int lowest_blkcnt;
-		BlockSampler const *block_sampler;
-	};
-
 	struct RtBlockPagingServerOptions
 	{
 		VM_DEFINE_ATTRIBUTE( uvec3, dim );
@@ -62,7 +28,7 @@ VM_EXPORT
 		~RtBlockPagingServer();
 
 	public:
-		RtBlockPagingClient update( OctreeCuller &culler, Camera const &camera );
+		BlockPaging update( OctreeCuller &culler, Camera const &camera );
 
 		void start();
 

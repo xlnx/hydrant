@@ -1,3 +1,4 @@
+#include <glog/logging.h>
 #include <hydrant/core/scene.hpp>
 
 VM_BEGIN_MODULE( hydrant )
@@ -11,7 +12,7 @@ VM_EXPORT
 		} else if ( cfg.orbit ) {
 			update_params( *cfg.orbit );
 		} else {
-			throw std::logic_error( "invalid config" );
+			LOG( FATAL ) << "invalid config";
 		}
 		if ( cfg.perspective ) {
 			ctg_fovy_2 = 1.f / tan( radians( cfg.perspective->fovy / 2.f ) );

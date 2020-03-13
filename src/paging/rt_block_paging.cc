@@ -1,10 +1,11 @@
 #include <set>
 #include <algorithm>
-#include <hydrant/rt_block_paging.hpp>
+#include <glog/logging.h>
 #include <hydrant/bridge/texture_3d.hpp>
 #include <hydrant/bridge/buffer_3d.hpp>
 #include <hydrant/unarchiver.hpp>
-#include <hydrant/unarchive_pipeline.hpp>
+#include <hydrant/paging/unarchive_pipeline.hpp>
+#include <hydrant/paging/rt_block_paging.hpp>
 
 #define MAX_SAMPLER_COUNT ( 4096 )
 
@@ -31,7 +32,7 @@ struct RtBlockPagingRegistry
 	map<Idx, int> lowest_block_sampler_id;
 
 public:
-	RtBlockPagingRegistry( RtBlockPagingClient &client,
+	RtBlockPagingRegistry( BlockPaging &client,
 						   vector<LowestLevelBlock> const &lowest_blocks,
 						   vm::Option<cufx::Device> const &device )
 	{
@@ -104,7 +105,7 @@ public:
 
 	vector<Texture3D<unsigned char>> block_storage;
 
-	RtBlockPagingClient client;
+	BlockPaging client;
 };
 
 MtArchive const *RtBlockPagingServerImpl::sample_level( size_t level ) const
@@ -134,7 +135,7 @@ void RtBlockPagingServerImpl::unarchive_lowest_level()
 	auto nblk_x = ( 1 << level ) * arch.block_size;
 	auto nblk_y = lvl0_arch->block_size;
 	if ( nblk_x % nblk_y != 0 ) {
-		throw logic_error( "nblk_x % nblk_y != 0" );
+		LOG( FATAL ) << "nblk_x % nblk_y != 0";
 	}
 
 	auto nblk_scale = nblk_x / nblk_y;
@@ -235,14 +236,15 @@ RtBlockPagingServerImpl::RtBlockPagingServerImpl( RtBlockPagingServerOptions con
 						  .set_dim( pad_bs )
 						  .set_device( opts.device )
 						  .set_opts( opts.storage_opts );
-	
+
 	auto mem_limit_bytes = opts.mem_limit_mb * 1024 * 1024;
 	auto block_bytes = pad_bs * pad_bs * pad_bs;
 	max_block_count = mem_limit_bytes / block_bytes;
 	max_block_count = std::min( max_block_count, MAX_SAMPLER_COUNT - lowest_blocks.size() );
-	vm::println( "MEM_LIMIT_BYTES = {}", mem_limit_bytes );
-	vm::println( "BLOCK_BYTES = {}", block_bytes );
-	vm::println( "MAX_BLOCK_COUNT = {}", max_block_count );
+
+	LOG( INFO ) << vm::fmt( "MEM_LIMIT_BYTES = {}", mem_limit_bytes );
+	LOG( INFO ) << vm::fmt( "BLOCK_BYTES = {}", block_bytes );
+	LOG( INFO ) << vm::fmt( "MAX_BLOCK_COUNT = {}", max_block_count );
 
 	unarchiver.reset( new Unarchiver( opts.dataset->root.resolve( lvl0_arch->path ).resolved() ) );
 	pipeline.reset(
@@ -252,7 +254,7 @@ RtBlockPagingServerImpl::RtBlockPagingServerImpl( RtBlockPagingServerOptions con
 			unique_lock<mutex> lk( idxs_mut );
 			int vaddr_id = -1;
 			if ( present_idxs.count( idx ) ) {
-				vm::println( "abandoned {}", idx );
+				LOG( WARNING ) << vm::fmt( "abandoned {}", idx );
 				return;
 			}
 			if ( block_storage.size() < max_block_count ) {
@@ -264,7 +266,7 @@ RtBlockPagingServerImpl::RtBlockPagingServerImpl( RtBlockPagingServerOptions con
 			} else if ( redundant_idxs.size() ) {
 				auto swap_idx = redundant_idxs.back();
 				redundant_idxs.pop_back();
-				vm::println( "swap +{} -{}", idx, swap_idx );
+				LOG( INFO ) << vm::fmt( "swap +{} -{}", idx, swap_idx );
 				present_idxs.erase( swap_idx );
 				auto uvec3_idx = uvec3( swap_idx.x, swap_idx.y, swap_idx.z );
 				auto &swap_vaddr = vaddr_buf[ uvec3_idx ];
@@ -272,7 +274,7 @@ RtBlockPagingServerImpl::RtBlockPagingServerImpl( RtBlockPagingServerOptions con
 				/* reset that block to lowest sample level */
 				swap_vaddr = basic_vaddr_buf[ uvec3_idx ];
 			} else {
-				throw logic_error( vm::fmt( "internal error: invalid state when transferring block {}", idx ) );
+				LOG( FATAL ) << vm::fmt( "internal error: invalid state when transferring block {}", idx );
 			}
 
 			auto storage_id = vaddr_id - lowest_blocks.size();
@@ -336,7 +338,7 @@ VM_EXPORT
 	{
 	}
 
-	RtBlockPagingClient RtBlockPagingServer::update( OctreeCuller & culler, Camera const &camera )
+	BlockPaging RtBlockPagingServer::update( OctreeCuller & culler, Camera const &camera )
 	{
 		_->update( culler, camera );
 		return _->client;

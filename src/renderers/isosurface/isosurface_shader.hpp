@@ -5,7 +5,7 @@
 #include <hydrant/core/shader.hpp>
 #include <hydrant/bridge/sampler.hpp>
 #include <hydrant/pixel_template.hpp>
-#include <hydrant/rt_block_paging.hpp>
+#include <hydrant/paging/block_paging.hpp>
 
 VM_BEGIN_MODULE( hydrant )
 
@@ -20,9 +20,10 @@ VM_EXPORT
 		mat4 to_world;
 		vec3 eye_pos;
 		vec3 light_pos;
+		vec3 surface_color;
 		float isovalue;
 		Sampler chebyshev;
-		RtBlockPagingClient paging;
+		BlockPaging paging;
 	};
 }
 

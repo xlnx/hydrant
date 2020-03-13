@@ -18,10 +18,6 @@ VM_EXPORT
 	{
 		if ( !Super::init( dataset, cfg ) ) { return false; }
 
-		auto params = cfg.params.get<BlocksRendererParams>();
-		shader.render_mode = params.mode;
-		shader.density = params.density;
-
 		auto &lvl0_arch = dataset->meta.sample_levels[ 0 ].archives[ 0 ];
 
 		auto chebyshev_thumb = std::make_shared<vol::Thumbnail<int>>(
@@ -34,10 +30,21 @@ VM_EXPORT
 		mean = create_texture( mean_thumb );
 		shader.mean_tex = mean.sampler();
 
+		update( cfg.params );
+
 		return true;
 	}
 
-	cufx::Image<> BlocksRenderer::offline_render( Camera const &camera )
+	void BlocksRenderer::update( vm::json::Any const &params_in )
+	{
+		Super::update( params_in );
+
+		auto params = params_in.get<BlocksRendererParams>();
+		shader.render_mode = params.mode;
+		shader.density = params.density;
+	}
+
+	cufx::Image<> BlocksRenderer::offline_render_ctxed( OfflineRenderCtx & ctx, Camera const &camera )
 	{
 		auto film = create_film();
 		raycaster.ray_emit_pass( exhibit,

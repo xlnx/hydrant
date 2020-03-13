@@ -3,6 +3,7 @@
 #include <thread>
 #include <fstream>
 #include <algorithm>
+#include <glog/logging.h>
 #include <cudafx/device.hpp>
 #include <cudafx/kernel.hpp>
 #include <cudafx/image.hpp>
@@ -113,14 +114,14 @@ VM_EXPORT
 		template <typename F>
 		std::function<void( void * )> get_shading_device( ShadingDevice::_enumerated dev ) const
 		{
-			auto shader_meta = ShaderRegistry::instance.meta.find( typeid( F ) );
-			if ( shader_meta == ShaderRegistry::instance.meta.end() ) {
-				throw std::logic_error( "no such shader" );
+			auto shader_meta = ShaderRegistry::instance().meta.find( typeid( F ) );
+			if ( shader_meta == ShaderRegistry::instance().meta.end() ) {
+				LOG( FATAL ) << "no such shader";
 			}
 
 			auto cuda_shader_kernel = shader_meta->second.devices.find( dev );
 			if ( cuda_shader_kernel == shader_meta->second.devices.end() ) {
-				throw std::logic_error( "no cuda shader kernel" );
+				LOG( FATAL ) << "no cuda shader kernel";
 			}
 
 			return cuda_shader_kernel->second;

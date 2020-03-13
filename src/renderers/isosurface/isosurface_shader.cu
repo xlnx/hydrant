@@ -58,7 +58,7 @@ struct IsosurfaceShaderKernel : IsosurfaceShader
 						auto &d = ray.d;
 						auto &dt = step;
 
-						pixel.v = vec4( 0.78, 0.13, 0.13, 1.0 );
+						pixel.v = vec4( surface_color, 1.0 );
 
 						/* linear approximation of intersection point */
 						vec3 prev_p = p - dt * d;

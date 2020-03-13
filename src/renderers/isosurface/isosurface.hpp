@@ -9,9 +9,10 @@ VM_BEGIN_MODULE( hydrant )
 
 VM_EXPORT
 {
-	struct IsosurfaceRendererConfig : vm::json::Serializable<IsosurfaceRendererConfig>
+	struct IsosurfaceRendererParams : vm::json::Serializable<IsosurfaceRendererParams>
 	{
 		VM_JSON_FIELD( IsosurfaceRenderMode, mode ) = IsosurfaceRenderMode::Color;
+		VM_JSON_FIELD( vec3, surface_color ) = { 1.f, 1.f, 1.f };
 		VM_JSON_FIELD( float, isovalue ) = 0.5f;
 		VM_JSON_FIELD( std::size_t, mem_limit_mb ) = 1024 * 2;
 	};
@@ -23,9 +24,14 @@ VM_EXPORT
 		bool init( std::shared_ptr<Dataset> const &dataset,
 				   RendererConfig const &cfg ) override;
 
-		cufx::Image<> offline_render( Camera const &camera ) override;
+		void update( vm::json::Any const &params ) override;
 
-		void render_loop( IRenderLoop &loop ) override;
+	protected:
+		OfflineRenderCtx *create_offline_render_ctx() override;
+
+		cufx::Image<> offline_render_ctxed( OfflineRenderCtx &ctx, Camera const &camera ) override;
+
+		void realtime_render_dynamic( IRenderLoop &loop ) override;
 
 	private:
 		vol::MtArchive *lvl0_arch;

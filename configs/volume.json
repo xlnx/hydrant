@@ -18,7 +18,7 @@
         ],
         "renderer": "Volume",
         "params": {
-            "density": 1e-1,
+            "density": 2e-2,
             "max_steps": 4000,
             "transfer_fn": {
                 "values": [

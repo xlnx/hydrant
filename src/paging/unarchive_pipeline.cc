@@ -1,4 +1,4 @@
-#include <hydrant/unarchive_pipeline.hpp>
+#include <hydrant/paging/unarchive_pipeline.hpp>
 
 VM_BEGIN_MODULE( hydrant )
 
