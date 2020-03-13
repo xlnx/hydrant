@@ -85,7 +85,7 @@ int main( int argc, char **argv )
 		renderer->offline_render( cfg.camera ).dump( out.resolved() );
 	} else {
 		auto opts = GlfwRenderLoopOptions{}
-					  .set_resolution( 1280, 768 )
+					  .set_resolution( 1600, 900 )
 					  .set_title( "hydrant" );
 		LocalRenderLoop loop( opts, cfg, *renderer );
 		loop.orbit = *cfg.camera.orbit;

@@ -18,21 +18,21 @@ struct Fbo
 		glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST );
 		glBindTexture( GL_TEXTURE_2D, 0 );
 
-		glGenFramebuffersEXT( 1, &_ );
+		glGenFramebuffers( 1, &_ );
 		bind();
-		glFramebufferTexture2DEXT( GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT,
-								   GL_TEXTURE_2D, tex, 0 );
+		glFramebufferTexture2D( GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
+								GL_TEXTURE_2D, tex, 0 );
 		unbind();
 	}
 
 	void bind() const
 	{
-		glBindFramebufferEXT( GL_FRAMEBUFFER_EXT, _ );
+		glBindFramebuffer( GL_FRAMEBUFFER, _ );
 	}
 
 	void unbind() const
 	{
-		glBindFramebufferEXT( GL_FRAMEBUFFER_EXT, 0 );		
+		glBindFramebuffer( GL_FRAMEBUFFER, 0 );		
 	}
 
 	GLuint texture() const { return tex; }
@@ -57,7 +57,7 @@ VM_EXPORT
 						 IRenderer &renderer ) :
 		  GlfwRenderLoop( opts, cfg.camera ),
 		  ui( UiFactory{}.create( cfg.render.renderer ) ),
-		  //		  fbo( new Fbo( cfg.render.resolution ) ),
+		  fbo( new Fbo( cfg.render.resolution ) ),
 		  config( cfg ),
 		  renderer( renderer )
 		{
@@ -73,6 +73,8 @@ VM_EXPORT
 
 			IMGUI_CHECKVERSION();
 			ImGui::CreateContext();
+			ImGuiIO &io = ImGui::GetIO();
+			io.ConfigWindowsMoveFromTitleBarOnly = true;
 			//io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
 			//io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
 
@@ -140,6 +142,8 @@ VM_EXPORT
 
 		void on_frame( cufx::Image<> &frame ) override
 		{
+			// GlfwRenderLoop::on_frame( frame );
+			glClear( GL_COLOR_BUFFER_BIT );
 			ui_main( frame );
 
 			frames += 1;
@@ -185,20 +189,29 @@ VM_EXPORT
 			ImGui::Begin( "Viewport" );
 			auto pos = ImGui::GetCursorScreenPos();
 			
-			// fbo->bind();
+			fbo->bind();
 
 			GLint vp[ 4 ];
 			glGetIntegerv( GL_VIEWPORT, vp );
 			glViewport( 0, 0, res.x, res.y );
-			//GlfwRenderLoop::on_frame( frame );
+
+			glDisable( GL_DEPTH_TEST );
+
+			glRasterPos2f( -1, 1 );
+			glPixelZoom( 1, -1 );
+
+			check_gl_error();
+			glDrawPixels( res.x, res.y, GL_RGB, GL_UNSIGNED_BYTE, &frame.at( 0, 0 ) );
+			check_gl_error();
+
+			glEnable( GL_DEPTH_TEST );
+			
 			glViewport( vp[0], vp[1], vp[2], vp[3] );
 
-			// fbo->unbind();
+			fbo->unbind();
 
-			//ImGui::GetWindowDrawList()->AddImage( (ImTextureID)fbo->texture(),
-			//									  ImVec2( ImGui::GetItemRectMin().x + pos.x,
-			//											  ImGui::GetItemRectMin().y + pos.y ),
-			//									  ImVec2( 1024, 1024 ) );
+			ImGui::GetWindowDrawList()->AddImage( (ImTextureID)fbo->texture(), pos,
+												  ImVec2( pos.x + res.x, pos.y + res.y ) );
 			
 			ImGui::End();
 		}
@@ -230,7 +243,7 @@ VM_EXPORT
 
 	public:
 		vm::Box<IUi> ui;
-		// vm::Box<Fbo> fbo;
+		vm::Box<Fbo> fbo;
 		Config &config;
 		IRenderer &renderer;
 		double prev = NAN;
