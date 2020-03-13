@@ -8,7 +8,8 @@
 #include <VMUtils/fmt.hpp>
 #include <VMUtils/timer.hpp>
 #include <VMUtils/cmdline.hpp>
-#include "local_render_loop.hpp"
+#include <hydrant/application.hpp>
+#include <hydrant/core/renderer.hpp>
 
 using namespace std;
 using namespace vol;
@@ -84,15 +85,18 @@ int main( int argc, char **argv )
 
 		renderer->offline_render( cfg.camera ).dump( out.resolved() );
 	} else {
-		auto opts = GlfwRenderLoopOptions{}
-					  .set_resolution( 1600, 900 )
-					  .set_title( "hydrant" );
-		LocalRenderLoop loop( opts, cfg, *renderer );
-		loop.orbit = *cfg.camera.orbit;
+		// auto opts = GlfwRenderLoopOptions{}
+		// 			  .set_resolution( 1600, 900 )
+		// 			  .set_title( "hydrant" );
+		// LocalRenderLoop loop( opts, cfg, *renderer );
+		// loop.orbit = *cfg.camera.orbit;
 
-		renderer->realtime_render(
-		  loop,
-		  RealtimeRenderOptions{}
-			.set_quality( a.get<RealtimeRenderQuality>( "quality" ) ) );
+		Application app( factory, { cfg } );
+		app.run();
+
+		// renderer->realtime_render(
+		//   loop,
+		//   RealtimeRenderOptions{}
+		// 	.set_quality( a.get<RealtimeRenderQuality>( "quality" ) ) );
 	}
 }

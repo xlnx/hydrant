@@ -36,6 +36,8 @@ VM_EXPORT
 
 	void IsosurfaceRenderer::update( vm::json::Any const &params_in )
 	{
+		Super::update( params_in );
+
 		auto params = params_in.get<IsosurfaceRendererConfig>();
 		shader.surface_color = params.surface_color;
 		shader.isovalue = params.isovalue;

@@ -89,6 +89,13 @@ VM_EXPORT
 			return true;
 		}
 
+		void update( vm::json::Any const &params_in ) override
+		{
+			auto params = params_in.get<BasicRendererParams>();
+			shader.max_steps = params.max_steps;
+			clear_color = params.clear_color;
+		}
+
 	public:
 		cufx::Image<> offline_render( Camera const &camera ) override final
 		{
