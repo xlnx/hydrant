@@ -1,19 +1,12 @@
 #pragma once
 
-#include <hydrant/core/glm_math.hpp>
 #include <hydrant/bridge/texture_1d.hpp>
+#include <hydrant/transfer_fn.schema.hpp>
 
 VM_BEGIN_MODULE( hydrant )
 
 VM_EXPORT
 {
-	struct TransferFnConfig : vm::json::Serializable<TransferFnConfig>
-	{
-		// using ColorTable = ;
-
-		VM_JSON_FIELD( std::vector<vec4>, values );
-	};
-
 	struct TransferFn : Texture1D<vec4>
 	{
 		TransferFn() = default;

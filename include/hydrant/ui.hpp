@@ -48,19 +48,18 @@ VM_EXPORT
 	{
 		vm::Box<IUi> create( std::string const &name );
 
+		void activate( ImGuiContext *ctx );
+
 		static std::vector<std::string> list_candidates();
 	};
 }
 
 struct UiRegistry
 {
-	static UiRegistry &instance()
-	{
-		static UiRegistry _;
-		return _;
-	}
+	static UiRegistry instance;
 
 	std::map<std::string, std::function<IUi *()>> types;
+	std::map<std::string, std::function<void( ImGuiContext * )>> ctxreg;
 };
 
 #define REGISTER_UI( T, name ) \
@@ -69,12 +68,13 @@ struct UiRegistry
 #define REGISTER_UI_UNIQ_HELPER( ctr, T, name ) \
 	REGISTER_UI_UNIQ( ctr, T, name )
 
-#define REGISTER_UI_UNIQ( ctr, T, name )                               \
-	static int                                                         \
-	  ui_registrar__body__##ctr##__object =                            \
-		(                                                              \
-		  ::hydrant::__inner__::UiRegistry::instance().types[ name ] = \
-			[]() -> ::hydrant::IUi * { return new T; },                \
+#define REGISTER_UI_UNIQ( ctr, T, name )                                      \
+	static int                                                                \
+	  ui_registrar__body__##ctr##__object =                                   \
+		( ( ::hydrant::__inner__::UiRegistry::instance.types[ name ] =        \
+			  []() -> ::hydrant::IUi * { return new T; } ),                   \
+		  ( ::hydrant::__inner__::UiRegistry::instance.ctxreg[ name ] =       \
+			  []( ImGuiContext *ctx ) { ImGui::SetCurrentContext( ctx ); } ), \
 		  0 )
 
 VM_END_MODULE()

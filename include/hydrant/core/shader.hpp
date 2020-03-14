@@ -6,10 +6,10 @@
 #include <typeindex>
 #include <typeinfo>
 #include <glog/logging.h>
-#include <VMUtils/enum.hpp>
 #include <hydrant/core/glm_math.hpp>
 #include <cudafx/kernel.hpp>
 #include <cudafx/image.hpp>
+#include <hydrant/core/shader.schema.hpp>
 
 VM_BEGIN_MODULE( hydrant )
 
@@ -22,12 +22,6 @@ struct IShaderTypeErased
 
 VM_EXPORT
 {
-	VM_ENUM( ShadingDevice,
-			 Cpu, Cuda );
-
-	VM_ENUM( ShadingResult,
-			 Ok, Err );
-
 	struct IPixel
 	{
 		/* object space ray */
@@ -93,11 +87,7 @@ struct ShaderMeta
 
 struct ShaderRegistry
 {
-	static ShaderRegistry &instance()
-	{
-		static ShaderRegistry _;
-		return _;
-	}
+	static ShaderRegistry instance;
 
 	std::map<std::type_index, ShaderMeta> meta;
 };
@@ -323,10 +313,10 @@ struct ShaderRegistrar
 
 	int build()
 	{
-		if ( ShaderRegistry::instance().meta.count( _type_index ) ) {
+		if ( ShaderRegistry::instance.meta.count( _type_index ) ) {
 			LOG( FATAL ) << vm::fmt( "shader '{}' already registered", _meta.class_name );
 		}
-		ShaderRegistry::instance().meta[ _type_index ] = std::move( _meta );
+		ShaderRegistry::instance.meta[ _type_index ] = std::move( _meta );
 		return 0;
 	}
 
