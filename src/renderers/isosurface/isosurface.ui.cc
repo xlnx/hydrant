@@ -1,7 +1,8 @@
-#include "isosurface.hpp"
 #include <hydrant/ui.hpp>
+#include "isosurface.schema.hpp"
 
-VM_BEGIN_MODULE( hydrant )
+using namespace std;
+using namespace hydrant;
 
 struct IsosurfaceUi : IUiTyped<IsosurfaceRendererParams>
 {
@@ -21,5 +22,3 @@ struct IsosurfaceUi : IUiTyped<IsosurfaceRendererParams>
 };
 
 REGISTER_UI( IsosurfaceUi, "Isosurface" );
-
-VM_END_MODULE()

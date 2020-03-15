@@ -8,6 +8,7 @@
 #include <hydrant/core/glm_math.hpp>
 #include <hydrant/core/raycaster.hpp>
 #include <hydrant/core/render_loop.hpp>
+#include <hydrant/core/renderer.schema.hpp>
 
 VM_BEGIN_MODULE( hydrant )
 
@@ -17,21 +18,6 @@ VM_EXPORT
 	{
 		VM_DEFINE_ATTRIBUTE( vol::PackageMeta, meta );
 		VM_DEFINE_ATTRIBUTE( cppfs::FilePath, root );
-	};
-
-	struct RendererConfig : vm::json::Serializable<RendererConfig>
-	{
-		VM_JSON_FIELD( glm::ivec2, resolution ) = { 512, 512 };
-		VM_JSON_FIELD( std::string, renderer );
-		VM_JSON_FIELD( vm::json::Any, params ) = vm::json::Any();
-	};
-
-	VM_ENUM( RealtimeRenderQuality,
-			 Lossless, Dynamic );
-
-	struct RealtimeRenderOptions : vm::json::Serializable<RealtimeRenderOptions>
-	{
-		VM_JSON_FIELD( RealtimeRenderQuality, quality ) = RealtimeRenderQuality::Dynamic;
 	};
 
 	struct IRenderer : vm::Dynamic

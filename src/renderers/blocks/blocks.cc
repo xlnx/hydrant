@@ -4,59 +4,69 @@
 #include <hydrant/basic_renderer.hpp>
 #include <hydrant/core/render_loop.hpp>
 #include <hydrant/octree_culler.hpp>
-#include "blocks.hpp"
+#include <hydrant/basic_renderer.hpp>
+#include "blocks_shader.hpp"
 
 using namespace std;
 using namespace vol;
 
-VM_BEGIN_MODULE( hydrant )
-
-VM_EXPORT
+struct BlocksRenderer : BasicRenderer<BlocksShader>
 {
-	bool BlocksRenderer::init( std::shared_ptr<Dataset> const &dataset,
-							   RendererConfig const &cfg )
-	{
-		if ( !Super::init( dataset, cfg ) ) { return false; }
+	using Super = BasicRenderer<BlocksShader>;
 
-		auto &lvl0_arch = dataset->meta.sample_levels[ 0 ].archives[ 0 ];
+	bool init( std::shared_ptr<Dataset> const &dataset,
+			   RendererConfig const &cfg ) override;
 
-		auto chebyshev_thumb = std::make_shared<vol::Thumbnail<int>>(
-		  dataset->root.resolve( lvl0_arch.thumbnails[ "chebyshev" ] ).resolved() );
-		chebyshev = create_texture( chebyshev_thumb );
-		shader.chebyshev = chebyshev.sampler();
+	void update( vm::json::Any const &params ) override;
 
-		auto mean_thumb = std::make_shared<vol::Thumbnail<float>>(
-		  dataset->root.resolve( lvl0_arch.thumbnails[ "mean" ] ).resolved() );
-		mean = create_texture( mean_thumb );
-		shader.mean_tex = mean.sampler();
+	cufx::Image<> offline_render_ctxed( OfflineRenderCtx &ctx, Camera const &camera ) override;
 
-		update( cfg.params );
+private:
+	ThumbnailTexture<int> chebyshev;
+	ThumbnailTexture<float> mean;
+};
 
-		return true;
-	}
+bool BlocksRenderer::init( std::shared_ptr<Dataset> const &dataset,
+						   RendererConfig const &cfg )
+{
+	if ( !Super::init( dataset, cfg ) ) { return false; }
 
-	void BlocksRenderer::update( vm::json::Any const &params_in )
-	{
-		Super::update( params_in );
+	auto &lvl0_arch = dataset->meta.sample_levels[ 0 ].archives[ 0 ];
 
-		auto params = params_in.get<BlocksRendererParams>();
-		shader.render_mode = params.mode;
-		shader.density = params.density;
-	}
+	auto chebyshev_thumb = std::make_shared<vol::Thumbnail<int>>(
+	  dataset->root.resolve( lvl0_arch.thumbnails[ "chebyshev" ] ).resolved() );
+	chebyshev = create_texture( chebyshev_thumb );
+	shader.chebyshev = chebyshev.sampler();
 
-	cufx::Image<> BlocksRenderer::offline_render_ctxed( OfflineRenderCtx & ctx, Camera const &camera )
-	{
-		auto film = create_film();
-		raycaster.ray_emit_pass( exhibit,
-								 camera,
-								 film.view(),
-								 shader,
-								 RaycastingOptions{}
-								   .set_device( device ) );
-		return film.fetch_data().dump();
-	}
+	auto mean_thumb = std::make_shared<vol::Thumbnail<float>>(
+	  dataset->root.resolve( lvl0_arch.thumbnails[ "mean" ] ).resolved() );
+	mean = create_texture( mean_thumb );
+	shader.mean_tex = mean.sampler();
 
-	REGISTER_RENDERER( BlocksRenderer, "Blocks" );
+	update( cfg.params );
+
+	return true;
 }
 
-VM_END_MODULE()
+void BlocksRenderer::update( vm::json::Any const &params_in )
+{
+	Super::update( params_in );
+
+	auto params = params_in.get<BlocksRendererParams>();
+	shader.render_mode = params.mode;
+	shader.density = params.density;
+}
+
+cufx::Image<> BlocksRenderer::offline_render_ctxed( OfflineRenderCtx &ctx, Camera const &camera )
+{
+	auto film = create_film();
+	raycaster.ray_emit_pass( exhibit,
+							 camera,
+							 film.view(),
+							 shader,
+							 RaycastingOptions{}
+							   .set_device( device ) );
+	return film.fetch_data().dump();
+}
+
+REGISTER_RENDERER( BlocksRenderer, "Blocks" );

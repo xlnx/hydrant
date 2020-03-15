@@ -1,7 +1,5 @@
-#include "volume.hpp"
 #include <hydrant/ui.hpp>
-
-VM_BEGIN_MODULE( hydrant )
+#include "volume.schema.hpp"
 
 struct VolumeUi : IUiTyped<VolumeRendererParams>
 {
@@ -20,5 +18,3 @@ struct VolumeUi : IUiTyped<VolumeRendererParams>
 };
 
 REGISTER_UI( VolumeUi, "Volume" );
-
-VM_END_MODULE()

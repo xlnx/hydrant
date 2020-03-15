@@ -6,10 +6,10 @@
 #include <typeindex>
 #include <typeinfo>
 #include <glog/logging.h>
-#include <VMUtils/enum.hpp>
 #include <hydrant/core/glm_math.hpp>
 #include <cudafx/kernel.hpp>
 #include <cudafx/image.hpp>
+#include <hydrant/core/shader.schema.hpp>
 
 VM_BEGIN_MODULE( hydrant )
 
@@ -22,12 +22,6 @@ struct IShaderTypeErased
 
 VM_EXPORT
 {
-	VM_ENUM( ShadingDevice,
-			 Cpu, Cuda );
-
-	VM_ENUM( ShadingResult,
-			 Ok, Err );
-
 	struct IPixel
 	{
 		/* object space ray */

@@ -1,7 +1,5 @@
 #include "blocks_shader.hpp"
 
-VM_BEGIN_MODULE( hydrant )
-
 struct VisBlocksShaderKernel : BlocksShader
 {
 	__host__ __device__ int
@@ -57,5 +55,3 @@ REGISTER_SHADER_BUILDER(
 	.cuda<VisBlocksShaderKernel>()
 	.cpu<VisBlocksShaderKernel>(),
   BlocksShader );
-
-VM_END_MODULE()

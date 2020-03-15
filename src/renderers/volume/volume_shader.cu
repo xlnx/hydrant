@@ -1,6 +1,4 @@
-#include "volume.hpp"
-
-VM_BEGIN_MODULE( hydrant )
+#include "volume_shader.hpp"
 
 struct VolumeShaderKernel : VolumeShader
 {
@@ -58,5 +56,3 @@ REGISTER_SHADER_BUILDER(
 	.cuda<VolumeShaderKernel>()
 	.cpu<VolumeShaderKernel>(),
   VolumeShader );
-
-VM_END_MODULE()

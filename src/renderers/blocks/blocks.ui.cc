@@ -1,7 +1,5 @@
-#include "blocks.hpp"
 #include <hydrant/ui.hpp>
-
-VM_BEGIN_MODULE( hydrant )
+#include "blocks.schema.hpp"
 
 struct BlocksUi : IUiTyped<BlocksRendererParams>
 {
@@ -20,5 +18,3 @@ struct BlocksUi : IUiTyped<BlocksRendererParams>
 };
 
 REGISTER_UI( BlocksUi, "Blocks" );
-
-VM_END_MODULE()

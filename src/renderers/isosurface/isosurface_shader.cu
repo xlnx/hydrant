@@ -1,7 +1,5 @@
 #include "isosurface_shader.hpp"
 
-VM_BEGIN_MODULE( hydrant )
-
 struct IsosurfaceShaderKernel : IsosurfaceShader
 {
 	__host__ __device__ int
@@ -115,5 +113,3 @@ REGISTER_SHADER_BUILDER(
 	.cuda<IsosurfaceShaderKernel>()
 	.cpu<IsosurfaceShaderKernel>(),
   IsosurfaceShader );
-
-VM_END_MODULE()

@@ -6,18 +6,12 @@
 #include <hydrant/bridge/sampler.hpp>
 #include <hydrant/pixel_template.hpp>
 #include <hydrant/paging/block_paging.hpp>
+#include "volume.schema.hpp"
 
-VM_BEGIN_MODULE( hydrant )
-
-VM_EXPORT
+struct VolumeShader : IShader<StdVec4Pixel>
 {
-	struct VolumeShader : IShader<StdVec4Pixel>
-	{
-		float density;
-		Sampler transfer_fn;
-		Sampler chebyshev;
-		BlockPaging paging;
-	};
-}
-
-VM_END_MODULE()
+	float density;
+	Sampler transfer_fn;
+	Sampler chebyshev;
+	BlockPaging paging;
+};

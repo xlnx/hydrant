@@ -6,20 +6,11 @@
 #include <hydrant/bridge/sampler.hpp>
 #include <hydrant/pixel_template.hpp>
 #include <hydrant/paging/block_paging.hpp>
+#include "paging.schema.hpp"
 
-VM_BEGIN_MODULE( hydrant )
-
-VM_EXPORT
+struct PagingShader : IShader<StdVec4Pixel>
 {
-	// VM_ENUM( PagingRenderMode,
-	// 		 Color, Normal, Position );
-
-	struct PagingShader : IShader<StdVec4Pixel>
-	{
-		// PagingRenderMode mode;
-		Sampler chebyshev;
-		BlockPaging paging;
-	};
-}
-
-VM_END_MODULE()
+	// PagingRenderMode mode;
+	Sampler chebyshev;
+	BlockPaging paging;
+};

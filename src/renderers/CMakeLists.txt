@@ -1,0 +1,12 @@
+if (HYDRA_BUILD_ENGINE)
+    file(GLOB_RECURSE RENDERER_SRCS *.cc *.cu)
+    list(FILTER RENDERER_SRCS EXCLUDE REGEX ".*\\.ui\\.cc")
+    cuda_add_library(hydra-renderers ${RENDERER_SRCS})
+    vm_target_dependency(hydra-renderers hydra-engine PUBLIC)
+endif()
+
+if (HYDRA_BUILD_GUI)
+    file(GLOB_RECURSE RENDERER_UI_SRCS *.ui.cc)
+    cuda_add_library(hydra-renderer-uis ${RENDERER_UI_SRCS})
+    vm_target_dependency(hydra-renderer-uis hydra-gui PUBLIC)
+endif()

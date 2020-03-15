@@ -1,7 +1,5 @@
 #include "paging_shader.hpp"
 
-VM_BEGIN_MODULE( hydrant )
-
 struct PagingShaderKernel : PagingShader
 {
 	__host__ __device__ int
@@ -60,5 +58,3 @@ REGISTER_SHADER_BUILDER(
 	.cuda<PagingShaderKernel>()
 	.cpu<PagingShaderKernel>(),
   PagingShader );
-
-VM_END_MODULE()
