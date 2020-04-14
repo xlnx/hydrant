@@ -5,6 +5,7 @@ set(CMAKE_CXX_STANDARD 14)
 option(HYDRA_BUILD_ENGINE "build cuda renderer library" ON)
 option(HYDRA_BUILD_GUI "build glfw & imgui library" ON)
 option(HYDRA_BUILD_LOCAL "build local intereactive renderer" ON)
+option(HYDRA_BUILD_SERVER "build intereactive render server" ON)
 
 find_package(Git)
 execute_process(COMMAND ${GIT_EXECUTABLE} submodule update --init --recursive)

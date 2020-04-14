@@ -11,3 +11,7 @@ add_subdirectory(renderers)
 if (HYDRA_BUILD_LOCAL)
   add_subdirectory(local)
 endif()
+
+if (HYDRA_BUILD_SERVER)
+  add_subdirectory(server)
+endif()
