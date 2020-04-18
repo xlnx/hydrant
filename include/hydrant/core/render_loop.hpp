@@ -25,6 +25,8 @@ VM_EXPORT
 
 		virtual void on_frame( cufx::Image<> &frame ) = 0;
 
+		virtual void after_frame() {}
+
 		virtual void after_loop() {}
 
 	public:

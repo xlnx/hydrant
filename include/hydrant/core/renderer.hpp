@@ -5,9 +5,9 @@
 #include <cppfs/FilePath.h>
 #include <VMUtils/enum.hpp>
 #include <varch/package_meta.hpp>
-#include <hydrant/core/glm_math.hpp>
 #include <hydrant/core/raycaster.hpp>
 #include <hydrant/core/render_loop.hpp>
+#include <hydrant/core/renderer.schema.hpp>
 
 VM_BEGIN_MODULE( hydrant )
 
@@ -19,13 +19,6 @@ VM_EXPORT
 		VM_DEFINE_ATTRIBUTE( cppfs::FilePath, root );
 	};
 
-	struct RendererConfig : vm::json::Serializable<RendererConfig>
-	{
-		VM_JSON_FIELD( glm::ivec2, resolution ) = { 512, 512 };
-		VM_JSON_FIELD( std::string, renderer );
-		VM_JSON_FIELD( vm::json::Any, params ) = vm::json::Any();
-	};
-
 	struct IRenderer : vm::Dynamic
 	{
 		virtual bool init( std::shared_ptr<Dataset> const &dataset, RendererConfig const &cfg )
@@ -35,18 +28,11 @@ VM_EXPORT
 			return true;
 		}
 
+		virtual void update( vm::json::Any const &params ) {}
+
 		virtual cufx::Image<> offline_render( Camera const &camera ) = 0;
 
-		virtual void render_loop( IRenderLoop &loop )
-		{
-			loop.post_loop();
-			while ( !loop.should_stop() ) {
-				loop.post_frame();
-				auto frame = offline_render( loop.camera );
-				loop.on_frame( frame );
-			}
-			loop.after_loop();
-		}
+		virtual void realtime_render( IRenderLoop &loop, RealtimeRenderOptions const &opts = RealtimeRenderOptions{} ) = 0;
 
 	protected:
 		std::shared_ptr<Dataset> dataset;
@@ -75,7 +61,7 @@ VM_EXPORT
 
 struct RendererRegistry
 {
-	static RendererRegistry instance;
+	static RendererRegistry &instance() { static RendererRegistry _; return _; }
 
 	std::map<std::string, std::function<IRenderer *()>> types;
 };
@@ -90,7 +76,7 @@ struct RendererRegistry
 	static int                                                             \
 	  renderer_registrar__body__##ctr##__object =                          \
 		(                                                                  \
-		  ::hydrant::__inner__::RendererRegistry::instance.types[ name ] = \
+		 ::hydrant::__inner__::RendererRegistry::instance().types[ name ] = \
 			[]() -> ::hydrant::IRenderer * { return new T; },              \
 		  0 )
 

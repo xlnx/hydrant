@@ -1,12 +1,13 @@
 #pragma once
 
+#include <glog/logging.h>
 #include <cudafx/device.hpp>
 #include <cudafx/array.hpp>
 #include <cudafx/texture.hpp>
 #include <cudafx/transfer.hpp>
 #include <hydrant/core/glm_math.hpp>
 #include <hydrant/bridge/sampler.hpp>
-#include <hydrant/bridge/buffer3d.hpp>
+#include <hydrant/bridge/buffer_3d.hpp>
 
 VM_BEGIN_MODULE( hydrant )
 
@@ -102,7 +103,7 @@ VM_EXPORT
 								   f.wait();
 								   auto res = f.get();
 								   if ( !res.ok() ) {
-									   vm::eprintln( "source texture failed: {}", res.message() );
+									   LOG( ERROR ) << vm::fmt( "source texture failed: {}", res.message() );
 									   return false;
 								   }
 								   if ( cuda ) { cuda->tex = cufx::Texture( cuda->arr, opts->opts ); }

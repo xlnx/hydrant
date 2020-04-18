@@ -1,0 +1,24 @@
+{
+    "camera": {
+        "orbit": {
+            "arm": [
+                0,
+                0,
+                2.2
+            ]
+        },
+        "perspective": {
+            "fovy": 60
+        }
+    },
+    "render": {
+        "resolution": [
+            512,
+            512
+        ],
+        "renderer": "Paging",
+        "params": {
+            "max_steps": 4000
+        }
+    }
+}

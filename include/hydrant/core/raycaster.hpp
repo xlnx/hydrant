@@ -3,6 +3,7 @@
 #include <thread>
 #include <fstream>
 #include <algorithm>
+#include <glog/logging.h>
 #include <cudafx/device.hpp>
 #include <cudafx/kernel.hpp>
 #include <cudafx/image.hpp>
@@ -29,11 +30,11 @@ VM_EXPORT
 		}
 
 		template <typename P, typename F>
-		void cast( Exhibit const &e,
-				   Camera const &c,
-				   cufx::ImageView<P> &img,
-				   F const &f,
-				   RaycastingOptions const &opts )
+		void ray_emit_pass( Exhibit const &e,
+							Camera const &c,
+							cufx::ImageView<P> &img,
+							F const &f,
+							RaycastingOptions const &opts )
 		{
 			if ( opts.device.has_value() ) {
 				CudaRayEmitKernelArgs kernel_args;
@@ -53,9 +54,9 @@ VM_EXPORT
 		}
 
 		template <typename P, typename F>
-		void cast( cufx::ImageView<P> &img,
-				   F const &f,
-				   RaycastingOptions const &opts )
+		void ray_march_pass( cufx::ImageView<P> &img,
+							 F const &f,
+							 RaycastingOptions const &opts )
 		{
 			if ( opts.device.has_value() ) {
 				CudaRayMarchKernelArgs kernel_args;
@@ -73,16 +74,18 @@ VM_EXPORT
 		}
 
 		template <typename P, typename F>
-		void cast( cufx::ImageView<P> &img,
-				   cufx::ImageView<cufx::StdByte4Pixel> &dst,
-				   F const &f,
-				   RaycastingOptions const &opts )
+		void pixel_pass( cufx::ImageView<P> &img,
+						 cufx::ImageView<cufx::StdByte3Pixel> &dst,
+						 F const &f,
+						 RaycastingOptions const &opts,
+						 vec3 const &clear_color = vec3( 0 ) )
 		{
 			if ( opts.device.has_value() ) {
 				CudaPixelKernelArgs kernel_args;
 				kernel_args.shading_pass = ShadingPass::Pixel;
 				kernel_args.image_desc.create_from_img( img, true );
 				kernel_args.dst_desc.create_from_img( dst, true );
+				kernel_args.clear_color = saturate( clear_color );
 
 				return cast_cuda_impl( &kernel_args, f, opts );
 			} else {
@@ -90,6 +93,7 @@ VM_EXPORT
 				kernel_args.shading_pass = ShadingPass::Pixel;
 				kernel_args.image_desc.create_from_img( img, false );
 				kernel_args.dst_desc.create_from_img( dst, false );
+				kernel_args.clear_color = saturate( clear_color );
 
 				return cast_cpu_impl( &kernel_args, f, opts );
 			}
@@ -110,14 +114,14 @@ VM_EXPORT
 		template <typename F>
 		std::function<void( void * )> get_shading_device( ShadingDevice::_enumerated dev ) const
 		{
-			auto shader_meta = ShaderRegistry::instance.meta.find( typeid( F ) );
-			if ( shader_meta == ShaderRegistry::instance.meta.end() ) {
-				throw std::logic_error( "no such shader" );
+			auto shader_meta = ShaderRegistry::instance().meta.find( typeid( F ) );
+			if ( shader_meta == ShaderRegistry::instance().meta.end() ) {
+				LOG( FATAL ) << "no such shader";
 			}
 
 			auto cuda_shader_kernel = shader_meta->second.devices.find( dev );
 			if ( cuda_shader_kernel == shader_meta->second.devices.end() ) {
-				throw std::logic_error( "no cuda shader kernel" );
+				LOG( FATAL ) << "no cuda shader kernel";
 			}
 
 			return cuda_shader_kernel->second;

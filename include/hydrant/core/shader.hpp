@@ -5,10 +5,11 @@
 #include <functional>
 #include <typeindex>
 #include <typeinfo>
-#include <VMUtils/enum.hpp>
+#include <glog/logging.h>
 #include <hydrant/core/glm_math.hpp>
 #include <cudafx/kernel.hpp>
 #include <cudafx/image.hpp>
+#include <hydrant/core/shader.schema.hpp>
 
 VM_BEGIN_MODULE( hydrant )
 
@@ -21,12 +22,6 @@ struct IShaderTypeErased
 
 VM_EXPORT
 {
-	VM_ENUM( ShadingDevice,
-			 Cpu, Cuda );
-
-	VM_ENUM( ShadingResult,
-			 Ok, Err );
-
 	struct IPixel
 	{
 		/* object space ray */
@@ -92,7 +87,7 @@ struct ShaderMeta
 
 struct ShaderRegistry
 {
-	static ShaderRegistry instance;
+	static ShaderRegistry &instance() { static ShaderRegistry _; return _; }
 
 	std::map<std::type_index, ShaderMeta> meta;
 };
@@ -148,15 +143,16 @@ __device__ ray_march_shader_t *p_ray_march_shader = ray_march_shader_impl<P, F>;
 
 template <typename P, typename F>
 __host__ __device__ void
-  pixel_shader_impl( void const *pixel_in, void *pixel_out )
+  pixel_shader_impl( void const *pixel_in, void *pixel_out, void const *clear_color )
 {
 	auto &pixel_in_ = *reinterpret_cast<P const *>( pixel_in );
-	auto &pixel_out_ = *reinterpret_cast<uchar4 *>( pixel_out );
+	auto &pixel_out_ = *reinterpret_cast<uchar3 *>( pixel_out );
+	auto &clear_color_ = *reinterpret_cast<uchar3 const *>( clear_color );
 
-	pixel_in_.write_to( pixel_out_ );
+	pixel_in_.write_to( pixel_out_, clear_color_ );
 }
 
-using pixel_shader_t = void( void const *, void * );
+using pixel_shader_t = void( void const *, void *, void const * );
 
 template <typename P, typename F>
 __device__ pixel_shader_t *p_pixel_shader = pixel_shader_impl<P, F>;
@@ -181,6 +177,7 @@ struct BasicRayMarchKernelArgs : BasicKernelArgs
 struct BasicPixelKernelArgs : BasicKernelArgs
 {
 	ImageDesc dst_desc;
+	tvec3<unsigned char> clear_color;
 };
 
 struct CpuKernelLauncher
@@ -316,11 +313,10 @@ struct ShaderRegistrar
 
 	int build()
 	{
-		if ( ShaderRegistry::instance.meta.count( _type_index ) ) {
-			throw std::logic_error(
-			  vm::fmt( "shader '{}' already registered", _meta.class_name ) );
+		if ( ShaderRegistry::instance().meta.count( _type_index ) ) {
+			LOG( FATAL ) << vm::fmt( "shader '{}' already registered", _meta.class_name );
 		}
-		ShaderRegistry::instance.meta[ _type_index ] = std::move( _meta );
+		ShaderRegistry::instance().meta[ _type_index ] = std::move( _meta );
 		return 0;
 	}
 

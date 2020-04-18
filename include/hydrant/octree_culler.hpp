@@ -3,6 +3,7 @@
 #include <array>
 #include <numeric>
 #include <algorithm>
+#include <varch/thumbnail.hpp>
 #include <hydrant/core/glm_math.hpp>
 #include <hydrant/core/scene.hpp>
 
@@ -13,7 +14,7 @@ struct BoundingBox
 	vec3 min, max;
 };
 
-struct Frustrum
+struct Frustum
 {
 	bool contains( vec3 const &p ) const
 	{
@@ -35,6 +36,7 @@ struct Frustrum
 				}
 			}
 		}
+		return false;
 	}
 
 	bool contains( BoundingBox const &bbox, bool &strict ) const
@@ -82,9 +84,10 @@ VM_EXPORT
 	struct OctreeCuller
 	{
 		OctreeCuller( Exhibit const &exhibit,
-					  uvec3 const &dim ) :
+					  std::shared_ptr<vol::Thumbnail<int>> const &chebyshev_thumb ) :
 		  exhibit( exhibit ),
-		  dim( dim ),
+		  chebyshev_thumb( chebyshev_thumb ),
+		  dim( chebyshev_thumb->dim.x, chebyshev_thumb->dim.y, chebyshev_thumb->dim.z ),
 		  log_dim_up( log_2_up( dim.x ), log_2_up( dim.y ), log_2_up( dim.z ) ),
 		  dim_up( uvec3( 1 ) << log_dim_up )
 		{
@@ -103,21 +106,16 @@ VM_EXPORT
 			// for ( int i = 0; i < 4; ++i ) {
 			// 	vm::println( "+ {}, {}", frust.norm[ i ].o, frust.norm[ i ].d );
 			// }
-			for ( int i = 0; i != dim.x; ++i ) {
-				for ( int j = 0; j != dim.y; ++j ) {
-					for ( int k = 0; k != dim.z; ++k ) {
-						auto idx = vec3( i, j, k );
-						BoundingBox bbox{ idx, idx + 1.f };
-						bool strict;
-						if ( frust.contains( bbox, strict ) && strict ) {
-							res.emplace_back( vol::Idx{}
-												.set_x( i )
-												.set_y( j )
-												.set_z( k ) );
-						}
-					}
-				}
-			}
+			chebyshev_thumb->iterate_3d(
+			  [&]( auto &idx ) {
+				  if ( ( *chebyshev_thumb )[ idx ] == 0 ) {
+					  auto x = vec3( idx.x, idx.y, idx.z );
+					  // bool strict;
+					  if ( frust.contains_fast( BoundingBox{ x, x + 1.f } ) ) {
+						  res.emplace_back( idx );
+					  }
+				  }
+			  } );
 			auto length = std::min( limit, res.size() );
 			std::nth_element(
 			  res.begin(), res.begin() + length, res.end(),
@@ -152,9 +150,9 @@ VM_EXPORT
 		// 				  idx.x ];
 		// }
 
-		Frustrum get_frustrum( Camera const &camera,
-							   ScreenRect const &rect,
-							   mat4 const &trans ) const
+		Frustum get_frustrum( Camera const &camera,
+							  ScreenRect const &rect,
+							  mat4 const &trans ) const
 		{
 			vec3 border[ 4 ] = {
 				{ rect.max.x, rect.max.y, -camera.ctg_fovy_2 },
@@ -163,7 +161,7 @@ VM_EXPORT
 				{ rect.min.x, rect.max.y, -camera.ctg_fovy_2 },
 			};
 
-			Frustrum frust;
+			Frustum frust;
 			frust.orig = vec3( 0 );
 			frust.norm[ 0 ] = cross( border[ 0 ], border[ 1 ] );
 			frust.norm[ 1 ] = cross( border[ 1 ], border[ 2 ] );
@@ -179,6 +177,7 @@ VM_EXPORT
 
 	private:
 		Exhibit exhibit;
+		std::shared_ptr<vol::Thumbnail<int>> chebyshev_thumb;
 		uvec3 dim, log_dim_up, dim_up;
 		std::unique_ptr<OctreeNode> root;
 	};

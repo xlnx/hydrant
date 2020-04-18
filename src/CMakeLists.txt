@@ -1,16 +1,8 @@
-file(GLOB_RECURSE SOURCES *.cc *.cu *.c)
+if (HYDRA_BUILD_SERVER)
+  add_subdirectory(server)
+  add_subdirectory(zk)
+endif()
 
-cuda_add_executable(hydrant ${SOURCES})
-
-target_include_directories(hydrant PUBLIC
-  ${PROJECT_SOURCE_DIR}/include
-)
-
-vm_target_dependency(hydrant voxel_unarchive PUBLIC)
-vm_target_dependency(hydrant cudafx PUBLIC)
-vm_target_dependency(hydrant cppfs PUBLIC)
-vm_target_dependency(hydrant glm-cuda PUBLIC)
-
-target_link_libraries(hydrant glfw)
-target_link_libraries(hydrant dl)
-
+if (HYDRA_BUILD_CLIENT)
+  add_subdirectory(client)
+endif()

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <glog/logging.h>
 #include <cudafx/device.hpp>
 #include <cudafx/array.hpp>
 #include <cudafx/texture.hpp>
@@ -83,7 +84,7 @@ VM_EXPORT
 								   f.wait();
 								   auto res = f.get();
 								   if ( !res.ok() ) {
-									   vm::eprintln( "source texture failed: {}", res.message() );
+									   LOG( ERROR ) << vm::fmt( "source texture failed: {}", res.message() );
 									   return false;
 								   }
 								   if ( cuda ) { cuda->tex = cufx::Texture( cuda->arr, opts.opts ); }
