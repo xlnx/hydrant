@@ -5,7 +5,6 @@
 #include <cppfs/FilePath.h>
 #include <VMUtils/enum.hpp>
 #include <varch/package_meta.hpp>
-#include <hydrant/core/glm_math.hpp>
 #include <hydrant/core/raycaster.hpp>
 #include <hydrant/core/render_loop.hpp>
 #include <hydrant/core/renderer.schema.hpp>
@@ -62,7 +61,7 @@ VM_EXPORT
 
 struct RendererRegistry
 {
-	static RendererRegistry instance;
+	static RendererRegistry &instance() { static RendererRegistry _; return _; }
 
 	std::map<std::string, std::function<IRenderer *()>> types;
 };
@@ -77,7 +76,7 @@ struct RendererRegistry
 	static int                                                             \
 	  renderer_registrar__body__##ctr##__object =                          \
 		(                                                                  \
-		  ::hydrant::__inner__::RendererRegistry::instance.types[ name ] = \
+		 ::hydrant::__inner__::RendererRegistry::instance().types[ name ] = \
 			[]() -> ::hydrant::IRenderer * { return new T; },              \
 		  0 )
 

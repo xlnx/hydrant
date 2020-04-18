@@ -87,7 +87,7 @@ struct ShaderMeta
 
 struct ShaderRegistry
 {
-	static ShaderRegistry instance;
+	static ShaderRegistry &instance() { static ShaderRegistry _; return _; }
 
 	std::map<std::type_index, ShaderMeta> meta;
 };
@@ -313,10 +313,10 @@ struct ShaderRegistrar
 
 	int build()
 	{
-		if ( ShaderRegistry::instance.meta.count( _type_index ) ) {
+		if ( ShaderRegistry::instance().meta.count( _type_index ) ) {
 			LOG( FATAL ) << vm::fmt( "shader '{}' already registered", _meta.class_name );
 		}
-		ShaderRegistry::instance.meta[ _type_index ] = std::move( _meta );
+		ShaderRegistry::instance().meta[ _type_index ] = std::move( _meta );
 		return 0;
 	}
 

@@ -3,10 +3,8 @@ project(hydrant)
 set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
-option(HYDRA_BUILD_ENGINE "build cuda renderer library" ON)
-option(HYDRA_BUILD_GUI "build glfw & imgui library" ON)
-option(HYDRA_BUILD_MODS "build renderer modules" ON)
-option(HYDRA_BUILD_LOCAL "build local intereactive renderer" ON)
+option(HYDRA_BUILD_SERVER "build cuda renderer server" ON)
+option(HYDRA_BUILD_CLIENT "build glfw & imgui client" ON)
 
 find_package(Git)
 execute_process(COMMAND ${GIT_EXECUTABLE} submodule update --init --recursive)
@@ -35,9 +33,19 @@ set(CUDA_NVCC_FLAGS ${CMAKE_NVCC_FLAGS}
   --relocatable-device-code=true
   -Xcudafe
   --diag_suppress="2913" 
+  -I${PROJECT_SOURCE_DIR}/build/external/glm-cuda/include
+  -I${PROJECT_SOURCE_DIR}/build/external/VMUtils/include
+  -I${PROJECT_SOURCE_DIR}/build/external/cuda-fx/include
+  -I${PROJECT_SOURCE_DIR}/build/external/stbi/include
+  -L/usr/local/cuda/lib64/stubs
 )
+set(CUDA_CUDA_LIBRARY libcuda.so)
 
-include_directories(${PROJECT_SOURCE_DIR}/include)
+link_directories(/usr/local/cuda/lib64/stubs)
+include_directories(
+  ${PROJECT_SOURCE_DIR}/include
+  ${PROJECT_SOURCE_DIR}/ui
+)
 
 function(install_mod module)
   install(TARGETS ${module}
@@ -46,9 +54,6 @@ function(install_mod module)
 endfunction()
 
 add_subdirectory(src)
-if (HYDRA_BUILD_MODS)
-  add_subdirectory(mods)
-endif()
 
 install(FILES README.md 
   DESTINATION .

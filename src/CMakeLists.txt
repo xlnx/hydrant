@@ -1,11 +1,8 @@
-if (HYDRA_BUILD_ENGINE)
-  add_subdirectory(engine)
+if (HYDRA_BUILD_SERVER)
+  add_subdirectory(server)
+  add_subdirectory(zk)
 endif()
 
-if (HYDRA_BUILD_GUI)
-  add_subdirectory(gui)
-endif()
-
-if (HYDRA_BUILD_LOCAL)
-  add_subdirectory(local)
+if (HYDRA_BUILD_CLIENT)
+  add_subdirectory(client)
 endif()

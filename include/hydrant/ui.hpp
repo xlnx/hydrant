@@ -56,7 +56,7 @@ VM_EXPORT
 
 struct UiRegistry
 {
-	static UiRegistry instance;
+	static UiRegistry &instance() { static UiRegistry _; return _; }
 
 	std::map<std::string, std::function<IUi *()>> types;
 	std::map<std::string, std::function<void( ImGuiContext * )>> ctxreg;
@@ -71,9 +71,9 @@ struct UiRegistry
 #define REGISTER_UI_UNIQ( ctr, T, name )                                      \
 	static int                                                                \
 	  ui_registrar__body__##ctr##__object =                                   \
-		( ( ::hydrant::__inner__::UiRegistry::instance.types[ name ] =        \
+		( ( ::hydrant::__inner__::UiRegistry::instance().types[ name ] = \
 			  []() -> ::hydrant::IUi * { return new T; } ),                   \
-		  ( ::hydrant::__inner__::UiRegistry::instance.ctxreg[ name ] =       \
+		  ( ::hydrant::__inner__::UiRegistry::instance().ctxreg[ name ] = \
 			  []( ImGuiContext *ctx ) { ImGui::SetCurrentContext( ctx ); } ), \
 		  0 )
 

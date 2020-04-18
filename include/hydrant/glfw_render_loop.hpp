@@ -27,7 +27,7 @@ VM_EXPORT
 
 			glfwWindowHint( GLFW_CONTEXT_VERSION_MAJOR, 2 );
 			glfwWindowHint( GLFW_CONTEXT_VERSION_MINOR, 0 );
-			// glfwWindowHint( GLFW_RESIZABLE, GLFW_FALSE );
+			glfwWindowHint( GLFW_RESIZABLE, GLFW_FALSE );
 			// glfwWindowHint( GLFW_OPENGL_PROFILE, GLFW_OPENGL_COMPAT_PROFILE );
 
 			window = glfwCreateWindow( resolution.x, resolution.y,

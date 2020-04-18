@@ -2,6 +2,8 @@
 
 #include <VMUtils/enum.hpp>
 #include <VMUtils/json_binding.hpp>
+#include <hydrant/core/shader.schema.hpp>
+#include <hydrant/core/glm_math.hpp>
 
 VM_BEGIN_MODULE( hydrant )
 
