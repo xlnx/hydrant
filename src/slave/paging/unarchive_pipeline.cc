@@ -72,7 +72,8 @@ VM_EXPORT
 	{
 		auto pad_bs = unarchiver.padded_block_size();
 		if ( opts.device.has_value() ) {
-			buf.reset( new GlobalBuffer3D<unsigned char>( uvec3( pad_bs ), opts.device.value() ) );
+			buf.reset( new GlobalBuffer3D<unsigned char>( uvec3( pad_bs ),
+														  opts.device.value() ) );
 		} else {
 			buf.reset( new HostBuffer3D<unsigned char>( uvec3( pad_bs ) ) );
 		}
