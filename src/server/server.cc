@@ -38,8 +38,8 @@ public:
 	{
 		std::istringstream is( diff_str );
 		is >> cfg;
-		vm::println("{}", diff_str);
 		camera = cfg.params.camera;
+		renderer->update( cfg.params.render.params );
 	}
 
 public:
