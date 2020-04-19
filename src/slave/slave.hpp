@@ -1,5 +1,6 @@
 #pragma once
 
+#include <mpi.h>
 #include <VMUtils/nonnull.hpp>
 
 VM_BEGIN_MODULE( hydrant )
@@ -10,7 +11,8 @@ VM_EXPORT
 {
 	struct Slave
 	{
-		Slave( unsigned rank, unsigned nodes, std::string const &data_path );
+		Slave( MPI_Comm slave_comm, unsigned rank, unsigned nodes,
+			   std::string const &data_path );
 		~Slave();
 
 		void run();

@@ -64,24 +64,35 @@ int main( int argc, char **argv )
 	auto in = FilePath( a.get<string>( "in" ) );
 	auto in_str = in.resolved();
 	ensure_dir( in_str );
-	vector<char> in_vec( in_str.length() + 1, 0 );
-	strcpy( in_vec.data(), in_str.c_str() );
 	
-	int my_rank, num_procs, provided;
+	int my_rank, num_slaves, provided;
 	MPI_Init_thread( &argc, &argv, MPI_THREAD_SERIALIZED, &provided );
 	if ( provided != MPI_THREAD_SERIALIZED ) {
 		LOG( FATAL ) << "mpi: no MPI_THREAD_SERIALIZED support";
 	}
 	MPI_Comm_rank( MPI_COMM_WORLD, &my_rank );
-	MPI_Comm_size( MPI_COMM_WORLD, &num_procs );
+	MPI_Comm_size( MPI_COMM_WORLD, &num_slaves );
+	num_slaves -= 1;
 
 	if ( my_rank != 0 ) {
 		LOG( FATAL ) << "mpi: zk.rank != 0";
 	}
 
 	// data directory
-	MPI_Bcast( in_vec.data(), in_vec.size(), MPI_CHAR, my_rank, MPI_COMM_WORLD );
+	MPI_Bcast( (void *)in_str.data(), in_str.length() + 1,
+			   MPI_CHAR, my_rank, MPI_COMM_WORLD );
 	MPI_Barrier( MPI_COMM_WORLD );
+
+		std::vector<int> slave_ranks( num_slaves );
+	for ( int i = 0; i != num_slaves; ++i ) {
+		slave_ranks[ i ] = i + 1;
+	}
+
+	MPI_Group world_grp, slave_grp;
+	MPI_Comm slave_comm;
+	MPI_Comm_group( MPI_COMM_WORLD, &world_grp );
+	MPI_Group_incl( world_grp, num_slaves, slave_ranks.data(), &slave_grp );
+	MPI_Comm_create( MPI_COMM_WORLD, slave_grp, &slave_comm );
 	
 	Zookeeper zk( port );
 	zk.run();

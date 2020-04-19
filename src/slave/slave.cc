@@ -67,7 +67,9 @@ private:
 
 struct SlaveImpl
 {
-	SlaveImpl( unsigned rank, unsigned nodes, std::string const &data_path ) :
+	SlaveImpl( MPI_Comm slave_comm, unsigned rank, unsigned nodes,
+			   std::string const &data_path ) :
+		slave_comm( slave_comm ),
 		rank( rank ),
 		nodes( nodes ),
 		data_path( data_path )
@@ -102,6 +104,7 @@ public:
 	}
 
 private:
+	const MPI_Comm slave_comm;
 	const unsigned rank, nodes;
 	const std::string data_path;
 	std::map<int32_t, vm::Box<Session>> sessions;
@@ -109,8 +112,9 @@ private:
 
 VM_EXPORT
 {
-	Slave::Slave( unsigned rank, unsigned nodes, std::string const &data_path ) :
-		_( new SlaveImpl( rank, nodes, data_path ) )
+	Slave::Slave( MPI_Comm slave_comm, unsigned rank, unsigned nodes,
+				  std::string const &data_path ) :
+		_( new SlaveImpl( slave_comm, rank, nodes, data_path ) )
 	{
 	}
 
