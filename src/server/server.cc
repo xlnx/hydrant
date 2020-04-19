@@ -36,7 +36,10 @@ struct Session : IRenderLoop
 public:
 	void update( std::string const &diff_str )
 	{
-		// TODO: impl update
+		std::istringstream is( diff_str );
+		is >> cfg;
+		vm::println("{}", diff_str);
+		camera = cfg.params.camera;
 	}
 
 public:
@@ -80,7 +83,8 @@ public:
 			MpiCommand cmd;
 			cmd.bcast_header( 0 );
 			static std::string payload;
-			payload.resize( cmd.len );
+			payload.resize( cmd.len + 1 );
+			payload[ cmd.len ] = 0;
 			cmd.bcast_payload( 0, (void *)payload.data() );
 			auto it = sessions.find( cmd.tag );
 			if ( it == sessions.end() ) {
@@ -92,7 +96,6 @@ public:
 			} else {
 				it->second->update( payload );
 			}
-			vm::println( "node {}/{} got: {}", rank, nodes, payload );
 		}
 		
 		LOG( INFO ) << vm::fmt( "node {}/{} exited", rank, nodes );

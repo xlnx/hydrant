@@ -78,9 +78,11 @@ public:
 			auto cmd = MpiCommand{}.set_tag( tag ).set_len( cfg_str.length() + 1 );
 			cmd.bcast_header( 0 );
 			cmd.bcast_payload( 0, (void *)cfg_str.data() );
+		} else {			
+			auto cmd = MpiCommand{}.set_tag( tag ).set_len( msg->get_payload().length() );
+			cmd.bcast_header( 0 );
+			cmd.bcast_payload( 0, (void *)msg->get_payload().data() );
 		}
-		vm::println( "payload = {}, opcode = {}", msg->get_payload(), msg->get_opcode() );
-		//		wss.send( hdl, msg->get_payload(), msg->get_opcode() );
 	}
 
 	void on_close()
