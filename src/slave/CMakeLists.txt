@@ -24,18 +24,18 @@ find_package(MPI REQUIRED)
 
 file(GLOB_RECURSE SOURCES *.cc *.cu *.c)
 
-cuda_add_executable(hydra-server ${SOURCES})
+cuda_add_executable(hydra-slave ${SOURCES})
 include_directories(SYSTEM ${MPI_INCLUDE_PATH})
-target_link_libraries(hydra-server ${MPI_CXX_LIBRARIES})
+target_link_libraries(hydra-slave ${MPI_CXX_LIBRARIES})
 
-vm_target_dependency(hydra-server VMat PUBLIC)
-vm_target_dependency(hydra-server VMUtils PUBLIC)
-vm_target_dependency(hydra-server voxel_unarchive PUBLIC)
-vm_target_dependency(hydra-server cudafx PUBLIC)
-vm_target_dependency(hydra-server glm-cuda PUBLIC)
-vm_target_dependency(hydra-server cppfs PUBLIC)
-target_link_libraries(hydra-server glog)
+vm_target_dependency(hydra-slave VMat PUBLIC)
+vm_target_dependency(hydra-slave VMUtils PUBLIC)
+vm_target_dependency(hydra-slave voxel_unarchive PUBLIC)
+vm_target_dependency(hydra-slave cudafx PUBLIC)
+vm_target_dependency(hydra-slave glm-cuda PUBLIC)
+vm_target_dependency(hydra-slave cppfs PUBLIC)
+target_link_libraries(hydra-slave glog)
 
-install(TARGETS hydra-server
+install(TARGETS hydra-slave
   RUNTIME DESTINATION .
 )

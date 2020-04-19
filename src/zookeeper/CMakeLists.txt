@@ -16,16 +16,16 @@ find_package(MPI REQUIRED)
 
 file(GLOB_RECURSE SOURCES *.cc *.cu *.c)
 
-cuda_add_executable(hydra-zk ${SOURCES})
+cuda_add_executable(hydra-zookeeper ${SOURCES})
 include_directories(SYSTEM ${MPI_INCLUDE_PATH})
-target_link_libraries(hydra-zk ${MPI_CXX_LIBRARIES})
+target_link_libraries(hydra-zookeeper ${MPI_CXX_LIBRARIES})
 
-target_link_libraries(hydra-zk cpprest glog boost_system)
-vm_target_dependency(hydra-zk VMUtils PUBLIC)
-vm_target_dependency(hydra-zk glm-cuda PUBLIC)
-vm_target_dependency(hydra-zk cppfs PUBLIC)
+target_link_libraries(hydra-zookeeper cpprest glog boost_system)
+vm_target_dependency(hydra-zookeeper VMUtils PUBLIC)
+vm_target_dependency(hydra-zookeeper glm-cuda PUBLIC)
+vm_target_dependency(hydra-zookeeper cppfs PUBLIC)
 
-install(TARGETS hydra-zk
+install(TARGETS hydra-zookeeper
   RUNTIME DESTINATION .
 )
 install(FILES launch_server.sh hostfile.example

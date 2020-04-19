@@ -8,7 +8,7 @@
 #include <hydrant/basic_renderer.hpp>
 #include <hydrant/config.schema.hpp>
 #include <hydrant/mpi_command.hpp>
-#include "server.hpp"
+#include "slave.hpp"
 
 VM_BEGIN_MODULE( hydrant )
 
@@ -65,9 +65,9 @@ private:
 	int32_t tag;
 };
 
-struct ServerImpl
+struct SlaveImpl
 {
-	ServerImpl( unsigned rank, unsigned nodes, std::string const &data_path ) :
+	SlaveImpl( unsigned rank, unsigned nodes, std::string const &data_path ) :
 		rank( rank ),
 		nodes( nodes ),
 		data_path( data_path )
@@ -109,16 +109,16 @@ private:
 
 VM_EXPORT
 {
-	Server::Server( unsigned rank, unsigned nodes, std::string const &data_path ) :
-		_( new ServerImpl( rank, nodes, data_path ) )
+	Slave::Slave( unsigned rank, unsigned nodes, std::string const &data_path ) :
+		_( new SlaveImpl( rank, nodes, data_path ) )
 	{
 	}
 
-	Server::~Server()
+	Slave::~Slave()
 	{
 	}
 
-	void Server::run()
+	void Slave::run()
 	{
 		_->run();
 	}

@@ -8,7 +8,7 @@
 #include <cppfs/FilePath.h>
 #include <VMUtils/fmt.hpp>
 #include <VMUtils/timer.hpp>
-#include "server.hpp"
+#include "slave.hpp"
 
 using namespace std;
 using namespace hydrant;
@@ -51,8 +51,8 @@ int main( int argc, char **argv )
 	auto data_path = FilePath( data_path_buf );
 	ensure_dir( data_path.resolved() );
 
-	Server srv( my_rank, num_procs - 1, data_path.resolved() );
-	srv.run();
+	Slave slave( my_rank, num_procs - 1, data_path.resolved() );
+	slave.run();
 
 	MPI_Finalize();
 }

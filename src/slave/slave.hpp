@@ -4,19 +4,19 @@
 
 VM_BEGIN_MODULE( hydrant )
 
-struct ServerImpl;
+struct SlaveImpl;
 
 VM_EXPORT
 {
-	struct Server
+	struct Slave
 	{
-		Server( unsigned rank, unsigned nodes, std::string const &data_path );
-		~Server();
+		Slave( unsigned rank, unsigned nodes, std::string const &data_path );
+		~Slave();
 
 		void run();
 
 	private:
-		vm::Box<ServerImpl> _;
+		vm::Box<SlaveImpl> _;
 	};
 }
 

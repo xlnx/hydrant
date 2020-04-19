@@ -1,6 +1,6 @@
 if (HYDRA_BUILD_SERVER)
-  add_subdirectory(server)
-  add_subdirectory(zk)
+  add_subdirectory(zookeeper)
+  add_subdirectory(slave)
 endif()
 
 if (HYDRA_BUILD_CLIENT)
