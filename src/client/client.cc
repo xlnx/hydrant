@@ -31,7 +31,6 @@ struct ClientImpl : GlfwRenderLoop
 	  config( cfg )
 	{
 		g_clt = this;
-		orbit = *cfg.params.camera.orbit;
 		worker = std::thread( [this, addr] { this->worker_loop( addr ); } );
 	}
 
@@ -179,6 +178,18 @@ private:
 	}
 
 private:
+	void update_config()
+	{
+		auto writer = vm::json::Writer{}.set_pretty( false );
+		static std::string cfg_str;
+		auto new_cfg_str = writer.write( config );
+		if ( new_cfg_str != cfg_str ) {
+			// TODO: need lock on config
+			wsc.send( hdl, new_cfg_str, wspp::frame::opcode::TEXT );
+			cfg_str = std::move( new_cfg_str );
+		}
+	}
+	
 	void ui_toolbar()
 	{
 		ImGui::Begin( "Properties" );
@@ -198,6 +209,8 @@ private:
 		ui_renderer_bar();
 
 		ImGui::End();
+
+		update_config();
 	}
 
 	void ui_camera_bar()
@@ -205,7 +218,7 @@ private:
 		if ( !ImGui::CollapsingHeader( "Camera",
 									   ImGuiTreeNodeFlags_DefaultOpen ) ) return;
 
-		vec3 arm = orbit.arm;
+		vec3 &arm = config.params.camera.orbit->arm;
 		arm.x = radians( arm.x );
 		arm.y = radians( arm.y );
 		ImGui::SliderAngle( "Yaw", &arm.x, -180, 180 );
@@ -213,8 +226,6 @@ private:
 		ImGui::SliderFloat( "Distance", &arm.z, 0.1, 3.2 );
 		arm.x = degrees( arm.x );
 		arm.y = degrees( arm.y );
-		orbit.arm = arm;
-		camera.update_params( orbit );
 	}
 
 	void ui_renderer_bar()
@@ -251,9 +262,10 @@ private:
 	void on_cursor_pos( double x1, double y1 ) override
 	{
 		if ( trackball_rec ) {
-			orbit.arm.x += -( x1 - x0 ) / resolution.x * 90;
-			orbit.arm.y += ( y1 - y0 ) / resolution.y * 90;
-			orbit.arm.y = glm::clamp( orbit.arm.y, -90.f, 90.f );
+			vec3 &arm = config.params.camera.orbit->arm;
+			arm.x += -( x1 - x0 ) / resolution.x * 90;
+			arm.y += ( y1 - y0 ) / resolution.y * 90;
+			arm.y = glm::clamp( arm.y, -90.f, 90.f );
 		}
 		x0 = x1;
 		y0 = y1;
@@ -261,8 +273,9 @@ private:
 
 	void on_scroll( double dx, double dy ) override
 	{
-		orbit.arm.z += dy * ( -5e-2 );
-		orbit.arm.z = glm::clamp( orbit.arm.z, .1f, 3.f );
+		vec3 &arm = config.params.camera.orbit->arm;
+		arm.z += dy * ( -5e-2 );
+		arm.z = glm::clamp( arm.z, .1f, 3.f );
 	}
 
 	// 	void on_key( int key, int scancode, int action, int mods ) override
@@ -282,12 +295,10 @@ private:
 	std::mutex frame_mtx;
 	std::string payload_buf;
 	const char *frame_ptr = nullptr;
-
+	
 	Config config;
-	CameraOrbit orbit;
 	std::thread worker;
-	bool active = false;
-	bool hovered = false;
+	
 	double prev = NAN;
 	int nframes = 0;
 	int fps = 0;
