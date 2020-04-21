@@ -8,6 +8,7 @@
 #include <hydrant/core/raycaster.hpp>
 #include <hydrant/core/render_loop.hpp>
 #include <hydrant/core/renderer.schema.hpp>
+#include <hydrant/mpi_utils.hpp>
 
 VM_BEGIN_MODULE( hydrant )
 
@@ -18,6 +19,13 @@ VM_EXPORT
 		VM_DEFINE_ATTRIBUTE( vol::PackageMeta, meta );
 		VM_DEFINE_ATTRIBUTE( cppfs::FilePath, root );
 	};
+
+	struct RealtimeRenderOptions
+	{
+		VM_DEFINE_ATTRIBUTE( MpiComm, comm );
+		VM_DEFINE_ATTRIBUTE( RealtimeRenderQuality, quality ) = RealtimeRenderQuality::Dynamic;
+	};
+
 
 	struct IRenderer : vm::Dynamic
 	{

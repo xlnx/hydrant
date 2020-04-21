@@ -1,8 +1,6 @@
 #include <VMUtils/timer.hpp>
 #include <varch/utils/io.hpp>
-#include <varch/thumbnail.hpp>
-#include <hydrant/basic_renderer.hpp>
-#include <hydrant/double_buffering.hpp>
+#include <hydrant/dbuf_renderer.hpp>
 #include <hydrant/paging/rt_block_paging.hpp>
 #include <hydrant/paging/lossless_block_paging.hpp>
 #include "isosurface_shader.hpp"
@@ -10,9 +8,9 @@
 using namespace std;
 using namespace vol;
 
-struct IsosurfaceRenderer : BasicRenderer<IsosurfaceShader>
+struct IsosurfaceRenderer : DbufRenderer<IsosurfaceShader>
 {
-	using Super = BasicRenderer<IsosurfaceShader>;
+	using Super = DbufRenderer<IsosurfaceShader>;
 
 	bool init( std::shared_ptr<Dataset> const &dataset,
 			   RendererConfig const &cfg ) override;
@@ -24,12 +22,15 @@ protected:
 
 	cufx::Image<> offline_render_ctxed( OfflineRenderCtx &ctx, Camera const &camera ) override;
 
-	void realtime_render_dynamic( IRenderLoop &loop ) override;
+protected:
+	DbufRtRenderCtx *create_dbuf_rt_render_ctx() override;
+	
+	void dbuf_rt_render_frame( Image<cufx::StdByte3Pixel> &frame, DbufRtRenderCtx &ctx,
+							   IRenderLoop &loop, OctreeCuller &culler ) override;
 
 private:
 	vol::MtArchive *lvl0_arch;
 
-	std::shared_ptr<vol::Thumbnail<int>> chebyshev_thumb;
 	ThumbnailTexture<int> chebyshev;
 };
 
@@ -137,10 +138,22 @@ cufx::Image<> IsosurfaceRenderer::offline_render_ctxed( OfflineRenderCtx &ctx_in
 	return frame.fetch_data();
 }
 
-void IsosurfaceRenderer::realtime_render_dynamic( IRenderLoop &loop )
+struct IsosurfaceRtRenderCtx : DbufRtRenderCtx
 {
-	auto film = create_film();
+	Image<IsosurfaceShader::Pixel> film;
+	std::unique_ptr<RtBlockPagingServer> srv;
 
+public:
+	~IsosurfaceRtRenderCtx()
+	{
+		srv->stop();
+	}
+};
+
+DbufRtRenderCtx *IsosurfaceRenderer::create_dbuf_rt_render_ctx()
+{
+	auto ctx = new IsosurfaceRtRenderCtx;
+	ctx->film = create_film();
 	auto opts = RtBlockPagingServerOptions{}
 				  .set_dim( dim )
 				  .set_dataset( dataset )
@@ -150,53 +163,47 @@ void IsosurfaceRenderer::realtime_render_dynamic( IRenderLoop &loop )
 									   .set_filter_mode( cufx::Texture::FilterMode::Linear )
 									   .set_read_mode( cufx::Texture::ReadMode::NormalizedFloat )
 									   .set_normalize_coords( true ) );
-	RtBlockPagingServer srv( opts );
-	OctreeCuller culler( exhibit, chebyshev_thumb );
+	ctx->srv.reset( new RtBlockPagingServer( opts ) );
+	ctx->srv->start();
+	return ctx;
+}
 
-	FnDoubleBuffering loop_drv(
-	  ImageOptions{}
-		.set_device( device )
-		.set_resolution( resolution ),
-	  loop,
-	  [&]( auto &frame, auto frame_idx ) {
-		  std::size_t ns = 0, ns1 = 0;
+void IsosurfaceRenderer::dbuf_rt_render_frame( Image<cufx::StdByte3Pixel> &frame,
+											   DbufRtRenderCtx &ctx_in,
+											   IRenderLoop &loop, OctreeCuller &culler )
+{
+	auto &ctx = static_cast<IsosurfaceRtRenderCtx &>( ctx_in );
+	
+	std::size_t ns = 0, ns1 = 0;
 
-		  shader.to_world = inverse( exhibit.get_iet() );
-		  shader.light_pos = loop.camera.position +
-							 loop.camera.target +
-							 loop.camera.up +
-							 cross( loop.camera.target, loop.camera.up );
-		  shader.eye_pos = loop.camera.position;
-		  shader.paging = srv.update( culler, loop.camera );
+	shader.to_world = inverse( exhibit.get_iet() );
+	shader.light_pos = loop.camera.position +
+		loop.camera.target +
+		loop.camera.up +
+		cross( loop.camera.target, loop.camera.up );
+	shader.eye_pos = loop.camera.position;
+	shader.paging = ctx.srv->update( culler, loop.camera );
+	
+	{
+		vm::Timer::Scoped timer( [&]( auto dt ) {
+				ns1 += dt.ns().cnt();
+			} );
 
-		  {
-			  vm::Timer::Scoped timer( [&]( auto dt ) {
-				  ns1 += dt.ns().cnt();
-			  } );
+		auto opts = RaycastingOptions{}.set_device( device );
+		
+		raycaster.ray_emit_pass( exhibit,
+								 loop.camera,
+								 ctx.film.view(),
+								 shader,
+								 opts );
 
-			  auto opts = RaycastingOptions{}.set_device( device );
-
-			  raycaster.ray_emit_pass( exhibit,
-									   loop.camera,
-									   film.view(),
-									   shader,
-									   opts );
-
-			  raycaster.pixel_pass( film.view(),
-									frame.view(),
-									shader,
-									opts,
-									clear_color );
-		  }
-	  },
-	  [&]( auto &frame, auto frame_idx ) {
-		  auto fp = frame.fetch_data();
-		  loop.on_frame( fp );
-	  } );
-
-	srv.start();
-	loop_drv.run();
-	srv.stop();
+		auto view = frame.view();
+		raycaster.pixel_pass( ctx.film.view(),
+							  view,
+							  shader,
+							  opts,
+							  clear_color );
+	}
 }
 
 REGISTER_RENDERER( IsosurfaceRenderer, "Isosurface" );

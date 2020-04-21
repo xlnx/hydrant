@@ -99,23 +99,26 @@ VM_EXPORT
 	protected:
 		virtual cufx::Image<> offline_render_ctxed( OfflineRenderCtx &ctx, Camera const &camera ) = 0;
 
-		virtual OfflineRenderCtx *create_offline_render_ctx() { return new OfflineRenderCtx; }
+		virtual OfflineRenderCtx *create_offline_render_ctx()
+		{
+			return new OfflineRenderCtx;
+		}
 
 	public:
 		void realtime_render( IRenderLoop &loop, RealtimeRenderOptions const &opts ) override final
 		{
 			switch ( opts.quality._to_integral() ) {
 			case RealtimeRenderQuality::Lossless: {
-				realtime_render_lossless( loop );
+				realtime_render_lossless( loop, opts.comm );
 			} break;
 			case RealtimeRenderQuality::Dynamic: {
-				realtime_render_dynamic( loop );
+				realtime_render_dynamic( loop, opts.comm );
 			} break;
 			}
 		}
 
 	protected:
-		void realtime_render_default( IRenderLoop &loop )
+		void realtime_render_default( IRenderLoop &loop, MpiComm const &comm )
 		{
 			std::unique_ptr<OfflineRenderCtx> pctx( create_offline_render_ctx() );
 			loop.post_loop();
@@ -128,9 +131,15 @@ VM_EXPORT
 			loop.after_loop();
 		}
 
-		virtual void realtime_render_lossless( IRenderLoop &loop ) { realtime_render_default( loop ); }
+		virtual void realtime_render_lossless( IRenderLoop &loop, MpiComm const &comm )
+		{
+			realtime_render_default( loop, comm );
+		}
 
-		virtual void realtime_render_dynamic( IRenderLoop &loop ) { realtime_render_default( loop ); }
+		virtual void realtime_render_dynamic( IRenderLoop &loop, MpiComm const &comm )
+		{
+			realtime_render_default( loop, comm );
+		}
 
 	public:
 		template <typename T>

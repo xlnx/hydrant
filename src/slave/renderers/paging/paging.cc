@@ -1,29 +1,31 @@
 #include <VMUtils/timer.hpp>
-#include <varch/thumbnail.hpp>
-#include <hydrant/double_buffering.hpp>
-#include <hydrant/paging/rt_block_paging.hpp>
 #include <varch/utils/io.hpp>
-#include <hydrant/basic_renderer.hpp>
+#include <hydrant/dbuf_renderer.hpp>
+#include <hydrant/paging/rt_block_paging.hpp>
 #include "paging_shader.hpp"
 
 using namespace std;
 using namespace vol;
 
-struct PagingRenderer : BasicRenderer<PagingShader>
+struct PagingRenderer : DbufRenderer<PagingShader>
 {
-	using Super = BasicRenderer<PagingShader>;
+	using Super = DbufRenderer<PagingShader>;
 
 	bool init( std::shared_ptr<Dataset> const &dataset,
 			   RendererConfig const &cfg ) override;
 
+protected:
 	cufx::Image<> offline_render_ctxed( OfflineRenderCtx &ctx, Camera const &camera ) override;
 
-	void realtime_render_dynamic( IRenderLoop &loop ) override;
+protected:
+	DbufRtRenderCtx *create_dbuf_rt_render_ctx() override;
+	
+	void dbuf_rt_render_frame( Image<cufx::StdByte3Pixel> &frame, DbufRtRenderCtx &ctx,
+							   IRenderLoop &loop, OctreeCuller &culler ) override;
 
 private:
 	vol::MtArchive *lvl0_arch;
 
-	std::shared_ptr<vol::Thumbnail<int>> chebyshev_thumb;
 	ThumbnailTexture<int> chebyshev;
 };
 
@@ -51,10 +53,22 @@ cufx::Image<> PagingRenderer::offline_render_ctxed( OfflineRenderCtx &ctx, Camer
 	return film.fetch_data().dump();
 }
 
-void PagingRenderer::realtime_render_dynamic( IRenderLoop &loop )
+struct PagingRtRenderCtx : DbufRtRenderCtx
 {
-	auto film = create_film();
+	Image<PagingShader::Pixel> film;
+	std::unique_ptr<RtBlockPagingServer> srv;
 
+public:
+	~PagingRtRenderCtx()
+	{
+		srv->stop();
+	}
+};
+
+DbufRtRenderCtx *PagingRenderer::create_dbuf_rt_render_ctx()
+{
+	auto ctx = new PagingRtRenderCtx;
+	ctx->film = create_film();
 	auto opts = RtBlockPagingServerOptions{}
 				  .set_dim( dim )
 				  .set_dataset( dataset )
@@ -64,47 +78,40 @@ void PagingRenderer::realtime_render_dynamic( IRenderLoop &loop )
 									   .set_filter_mode( cufx::Texture::FilterMode::Linear )
 									   .set_read_mode( cufx::Texture::ReadMode::NormalizedFloat )
 									   .set_normalize_coords( true ) );
-	RtBlockPagingServer srv( opts );
-	OctreeCuller culler( exhibit, chebyshev_thumb );
+	ctx->srv.reset( new RtBlockPagingServer( opts ) );
+	ctx->srv->start();
+	return ctx;
+}
 
-	FnDoubleBuffering loop_drv(
-	  ImageOptions{}
-		.set_device( device )
-		.set_resolution( resolution ),
-	  loop,
-	  [&]( auto &frame, auto frame_idx ) {
-		  std::size_t ns = 0, ns1 = 0;
+void PagingRenderer::dbuf_rt_render_frame( Image<cufx::StdByte3Pixel> &frame,
+										   DbufRtRenderCtx &ctx_in,
+										   IRenderLoop &loop, OctreeCuller &culler )
+{
+	auto &ctx = static_cast<PagingRtRenderCtx &>( ctx_in );
 
-		  shader.paging = srv.update( culler, loop.camera );
-
-		  {
-			  vm::Timer::Scoped timer( [&]( auto dt ) {
-				  ns1 += dt.ns().cnt();
-			  } );
-
-			  auto opts = RaycastingOptions{}.set_device( device );
-
-			  raycaster.ray_emit_pass( exhibit,
-									   loop.camera,
-									   film.view(),
-									   shader,
-									   opts );
-
-			  raycaster.pixel_pass( film.view(),
-									frame.view(),
-									shader,
-									opts,
-									clear_color );
-		  }
-	  },
-	  [&]( auto &frame, auto frame_idx ) {
-		  auto fp = frame.fetch_data();
-		  loop.on_frame( fp );
-	  } );
-
-	srv.start();
-	loop_drv.run();
-	srv.stop();
+	std::size_t ns = 0, ns1 = 0;
+	
+	shader.paging = ctx.srv->update( culler, loop.camera );
+	
+	{
+		vm::Timer::Scoped timer( [&]( auto dt ) {
+				ns1 += dt.ns().cnt();
+			} );
+		
+		auto opts = RaycastingOptions{}.set_device( device );
+		
+		raycaster.ray_emit_pass( exhibit,
+								 loop.camera,
+								 ctx.film.view(),
+								 shader,
+								 opts );
+		
+		raycaster.pixel_pass( ctx.film.view(),
+							  frame.view(),
+							  shader,
+							  opts,
+							  clear_color );
+	}
 }
 
 REGISTER_RENDERER( PagingRenderer, "Paging" );

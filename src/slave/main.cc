@@ -8,6 +8,7 @@
 #include <cppfs/FilePath.h>
 #include <VMUtils/fmt.hpp>
 #include <VMUtils/timer.hpp>
+#include <cudafx/device.hpp>
 #include "slave.hpp"
 
 using namespace std;
@@ -81,7 +82,16 @@ int main( int argc, char **argv )
 		}
 	}
 
-	Slave slave( slave_comm, my_rank, num_slaves, data_path.resolved() );
+	auto devices = cufx::Device::scan();
+	if ( grp_size > devices.size() ) {
+		LOG( FATAL ) << "group.size() > devices.size()";
+	}
+
+	Slave slave( MpiComm{}
+                     .set_comm( slave_comm )
+                     .set_rank( my_rank )
+                     .set_size( num_slaves ),
+                 data_path.resolved() );
 	slave.run();
 
 	MPI_Finalize();

@@ -298,7 +298,7 @@ RtBlockPagingServerImpl::RtBlockPagingServerImpl( RtBlockPagingServerOptions con
 
 void RtBlockPagingServerImpl::update( OctreeCuller &culler, Camera const &camera )
 {
-	auto require_idxs = culler.cull( camera, max_block_count );
+	auto &require_idxs = culler.cull( camera, max_block_count );
 	{
 		std::unique_lock<std::mutex> lk( idxs_mut );
 

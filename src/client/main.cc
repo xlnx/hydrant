@@ -5,11 +5,10 @@
 #include <VMUtils/fmt.hpp>
 #include <VMUtils/timer.hpp>
 #include <VMUtils/cmdline.hpp>
-#include <hydrant/core/renderer.hpp>
 #include "client.hpp"
 
 using namespace std;
-using namespace vol;
+// using namespace vol;
 using namespace hydrant;
 
 template <typename Enum>

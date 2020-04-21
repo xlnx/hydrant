@@ -7,15 +7,15 @@
 #include <VMUtils/json_binding.hpp>
 #include <hydrant/basic_renderer.hpp>
 #include <hydrant/config.schema.hpp>
-#include <hydrant/mpi_command.hpp>
 #include "slave.hpp"
 
 VM_BEGIN_MODULE( hydrant )
 
 struct Session : IRenderLoop
 {
-	Session( int32_t tag, Config const &cfg ) :
+	Session( MpiComm const &comm, int32_t tag, Config const &cfg ) :
 		IRenderLoop( cfg.params.camera ),
+		comm( comm ),
 		path( cfg.data_path ),
 		renderer( RendererFactory( path ).create( cfg.params.render ) ),
 		tag( tag )
@@ -23,6 +23,7 @@ struct Session : IRenderLoop
 		worker = std::thread( [this] {
 				this->renderer->realtime_render( *this,
 												 RealtimeRenderOptions{}
+												 .set_comm( this->comm )
 												 .set_quality( RealtimeRenderQuality::Dynamic ) );
 			});
 	}
@@ -47,17 +48,20 @@ public:
 
 	void on_frame( cufx::Image<> &frame ) override
 	{
-		if ( stop ) return;
-		auto width = frame.get_width();
-		auto height = frame.get_height();
-		auto len = width * height * sizeof( uchar3 );
-		auto msg = MpiCommand{}.set_tag( tag ).set_len( len );
-		MPI_Send( &msg, sizeof( msg ), MPI_CHAR, 0, tag, MPI_COMM_WORLD );
-		MPI_Send( &frame.at( 0, 0 ), len, MPI_CHAR, 0, tag, MPI_COMM_WORLD );
+		if ( comm.rank == 0 ) {
+			if ( stop ) return;
+			auto width = frame.get_width();
+			auto height = frame.get_height();
+			auto len = width * height * sizeof( uchar3 );
+			auto msg = MpiInst{}.set_tag( tag ).set_len( len );
+			MPI_Send( &msg, sizeof( msg ), MPI_CHAR, 0, tag, MPI_COMM_WORLD );
+			MPI_Send( &frame.at( 0, 0 ), len, MPI_CHAR, 0, tag, MPI_COMM_WORLD );
+		}
 	}
 
 private:
 	bool stop = false;
+	MpiComm comm;
 	Config cfg;
 	cppfs::FilePath path;
 	vm::Box<IRenderer> renderer;
@@ -67,11 +71,8 @@ private:
 
 struct SlaveImpl
 {
-	SlaveImpl( MPI_Comm slave_comm, unsigned rank, unsigned nodes,
-			   std::string const &data_path ) :
-		slave_comm( slave_comm ),
-		rank( rank ),
-		nodes( nodes ),
+	SlaveImpl( MpiComm const &comm, std::string const &data_path ) :
+		comm( comm ),
 		data_path( data_path )
 	{
 	}
@@ -79,10 +80,10 @@ struct SlaveImpl
 public:
 	void run()
 	{
-		LOG( INFO ) << vm::fmt( "node {}/{} started in {}", rank, nodes, data_path );
+		LOG( INFO ) << vm::fmt( "node {}/{} started in {}", comm.rank, comm.size, data_path );
 		
 		while ( true ) {
-			MpiCommand cmd;
+			MpiInst cmd;
 			cmd.bcast_header( 0 );
 			static std::string payload;
 			payload.resize( cmd.len + 1 );
@@ -94,27 +95,25 @@ public:
 				Config cfg;
 				is >> cfg;
 				sessions.emplace( cmd.tag,
-								  vm::Box<Session>( new Session( cmd.tag, cfg ) ) );
+								  vm::Box<Session>( new Session( comm, cmd.tag, cfg ) ) );
 			} else {
 				it->second->update( payload );
 			}
 		}
 		
-		LOG( INFO ) << vm::fmt( "node {}/{} exited", rank, nodes );
+		LOG( INFO ) << vm::fmt( "node {}/{} exited", comm.rank, comm.size );
 	}
 
 private:
-	const MPI_Comm slave_comm;
-	const unsigned rank, nodes;
+	const MpiComm comm;
 	const std::string data_path;
 	std::map<int32_t, vm::Box<Session>> sessions;
 };
 
 VM_EXPORT
 {
-	Slave::Slave( MPI_Comm slave_comm, unsigned rank, unsigned nodes,
-				  std::string const &data_path ) :
-		_( new SlaveImpl( slave_comm, rank, nodes, data_path ) )
+	Slave::Slave( MpiComm comm, std::string const &data_path ) :
+		_( new SlaveImpl( comm, data_path ) )
 	{
 	}
 

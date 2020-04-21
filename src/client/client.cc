@@ -4,7 +4,7 @@
 #include <GLFW/glfw3.h>
 #include <glog/logging.h>
 #include <VMUtils/json_binding.hpp>
-#include <hydrant/basic_renderer.hpp>
+//#include <hydrant/basic_renderer.hpp>
 #include <hydrant/config.schema.hpp>
 #include <hydrant/ui.hpp>
 #include <hydrant/glfw_render_loop.hpp>
