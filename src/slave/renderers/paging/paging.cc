@@ -15,13 +15,17 @@ struct PagingRenderer : DbufRenderer<PagingShader>
 			   RendererConfig const &cfg ) override;
 
 protected:
-	cufx::Image<> offline_render_ctxed( OfflineRenderCtx &ctx, Camera const &camera ) override;
+	cufx::Image<> offline_render_ctxed( OfflineRenderCtx &ctx,
+										Camera const &camera ) override;
 
 protected:
 	DbufRtRenderCtx *create_dbuf_rt_render_ctx() override;
 	
-	void dbuf_rt_render_frame( Image<cufx::StdByte3Pixel> &frame, DbufRtRenderCtx &ctx,
-							   IRenderLoop &loop, OctreeCuller &culler ) override;
+	void dbuf_rt_render_frame( Image<cufx::StdByte3Pixel> &frame,
+							   DbufRtRenderCtx &ctx,
+							   IRenderLoop &loop,
+							   OctreeCuller &culler,
+							   MpiComm const &comm ) override;
 
 private:
 	vol::MtArchive *lvl0_arch;
@@ -85,7 +89,9 @@ DbufRtRenderCtx *PagingRenderer::create_dbuf_rt_render_ctx()
 
 void PagingRenderer::dbuf_rt_render_frame( Image<cufx::StdByte3Pixel> &frame,
 										   DbufRtRenderCtx &ctx_in,
-										   IRenderLoop &loop, OctreeCuller &culler )
+										   IRenderLoop &loop,
+										   OctreeCuller &culler,
+										   MpiComm const &comm )
 {
 	auto &ctx = static_cast<PagingRtRenderCtx &>( ctx_in );
 

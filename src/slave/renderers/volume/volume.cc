@@ -20,13 +20,17 @@ struct VolumeRenderer : DbufRenderer<VolumeShader>
 protected:
 	OfflineRenderCtx *create_offline_render_ctx() override;
 
-	cufx::Image<> offline_render_ctxed( OfflineRenderCtx &ctx, Camera const &camera ) override;
+	cufx::Image<> offline_render_ctxed( OfflineRenderCtx &ctx,
+										Camera const &camera ) override;
 
 protected:
 	DbufRtRenderCtx *create_dbuf_rt_render_ctx() override;
 	
-	void dbuf_rt_render_frame( Image<cufx::StdByte3Pixel> &frame, DbufRtRenderCtx &ctx,
-							   IRenderLoop &loop, OctreeCuller &culler ) override;
+	void dbuf_rt_render_frame( Image<cufx::StdByte3Pixel> &frame,
+							   DbufRtRenderCtx &ctx,
+							   IRenderLoop &loop,
+							   OctreeCuller &culler,
+							   MpiComm const &comm ) override;
 
 private:
 	TransferFn transfer_fn;
@@ -163,7 +167,9 @@ DbufRtRenderCtx *VolumeRenderer::create_dbuf_rt_render_ctx()
 
 void VolumeRenderer::dbuf_rt_render_frame( Image<cufx::StdByte3Pixel> &frame,
 										   DbufRtRenderCtx &ctx_in,
-										   IRenderLoop &loop, OctreeCuller &culler )
+										   IRenderLoop &loop,
+										   OctreeCuller &culler,
+										   MpiComm const &comm )
 {
 	auto &ctx = static_cast<VolumeRtRenderCtx &>( ctx_in );
 

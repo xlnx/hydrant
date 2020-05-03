@@ -8,7 +8,13 @@
 #include <hydrant/paging/block_paging.hpp>
 #include <isosurface.schema.hpp>
 
-struct IsosurfaceShader : IShader<StdVec4Pixel>
+struct IsosurfacePixel : StdVec4Pixel
+{
+	vec3 origin;
+	float depth;
+};
+
+struct IsosurfaceShader : IShader<IsosurfacePixel>
 {
 	IsosurfaceRenderMode mode;
 	mat4 to_world;

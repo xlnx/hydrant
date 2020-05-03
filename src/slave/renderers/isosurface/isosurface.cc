@@ -20,13 +20,17 @@ struct IsosurfaceRenderer : DbufRenderer<IsosurfaceShader>
 protected:
 	OfflineRenderCtx *create_offline_render_ctx() override;
 
-	cufx::Image<> offline_render_ctxed( OfflineRenderCtx &ctx, Camera const &camera ) override;
+	cufx::Image<> offline_render_ctxed( OfflineRenderCtx &ctx,
+										Camera const &camera ) override;
 
 protected:
 	DbufRtRenderCtx *create_dbuf_rt_render_ctx() override;
 	
-	void dbuf_rt_render_frame( Image<cufx::StdByte3Pixel> &frame, DbufRtRenderCtx &ctx,
-							   IRenderLoop &loop, OctreeCuller &culler ) override;
+	void dbuf_rt_render_frame( Image<cufx::StdByte3Pixel> &frame,
+							   DbufRtRenderCtx &ctx,
+							   IRenderLoop &loop,
+							   OctreeCuller &culler,
+							   MpiComm const &comm ) override;
 
 private:
 	vol::MtArchive *lvl0_arch;
@@ -170,7 +174,9 @@ DbufRtRenderCtx *IsosurfaceRenderer::create_dbuf_rt_render_ctx()
 
 void IsosurfaceRenderer::dbuf_rt_render_frame( Image<cufx::StdByte3Pixel> &frame,
 											   DbufRtRenderCtx &ctx_in,
-											   IRenderLoop &loop, OctreeCuller &culler )
+											   IRenderLoop &loop,
+											   OctreeCuller &culler,
+											   MpiComm const &comm )
 {
 	auto &ctx = static_cast<IsosurfaceRtRenderCtx &>( ctx_in );
 	
@@ -197,12 +203,16 @@ void IsosurfaceRenderer::dbuf_rt_render_frame( Image<cufx::StdByte3Pixel> &frame
 								 shader,
 								 opts );
 
+		//		if ( comm.rank == 0 ) {
+
 		auto view = frame.view();
 		raycaster.pixel_pass( ctx.film.view(),
 							  view,
 							  shader,
 							  opts,
 							  clear_color );
+
+		// }
 	}
 }
 

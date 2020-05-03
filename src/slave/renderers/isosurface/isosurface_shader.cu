@@ -32,6 +32,13 @@ struct IsosurfaceShaderKernel : IsosurfaceShader
 	}
 
 	__host__ __device__ void
+	  init( Pixel &pixel_out, Ray const &ray ) const
+	{
+		pixel_out.origin = ray.o;
+		pixel_out.depth = INFINITY;
+	}
+
+	__host__ __device__ void
 	  main( Pixel &pixel_in_out ) const
 	{
 		auto pixel = pixel_in_out;
@@ -92,6 +99,7 @@ struct IsosurfaceShaderKernel : IsosurfaceShader
 						} break;
 						}
 
+						pixel.depth = glm::distance( ray.o, pixel.origin );
 						nsteps = 0;
 
 						break;

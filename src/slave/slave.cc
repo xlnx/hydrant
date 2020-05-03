@@ -48,7 +48,8 @@ public:
 
 	void on_frame( cufx::Image<> &frame ) override
 	{
-		if ( comm.rank == 0 ) {
+		const int leader_rank = 0;
+		if ( comm.rank == leader_rank ) {
 			if ( stop ) return;
 			auto width = frame.get_width();
 			auto height = frame.get_height();

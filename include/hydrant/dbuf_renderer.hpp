@@ -30,7 +30,7 @@ VM_EXPORT
 				  auto bbox = slice_bbox( loop.camera, comm );
 				  culler.set_bbox( bbox );
 				  this->shader.bbox = Box3D{ bbox.min, bbox.max };
-				  dbuf_rt_render_frame( frame, *ctx, loop, culler );
+				  dbuf_rt_render_frame( frame, *ctx, loop, culler, comm );
 			  },
 			  [&]( auto &frame, auto frame_idx ) {
 				  auto fp = frame.fetch_data();
@@ -98,8 +98,11 @@ VM_EXPORT
 			return new DbufRtRenderCtx;
 		}
 
-		virtual void dbuf_rt_render_frame( Image<cufx::StdByte3Pixel> &frame, DbufRtRenderCtx &ctx,
-										   IRenderLoop &loop, OctreeCuller &culler ) = 0;
+		virtual void dbuf_rt_render_frame( Image<cufx::StdByte3Pixel> &frame,
+										   DbufRtRenderCtx &ctx,
+										   IRenderLoop &loop,
+										   OctreeCuller &culler,
+										   MpiComm const &comm ) = 0;
 
 	protected:
 		std::shared_ptr<vol::Thumbnail<int>> chebyshev_thumb;

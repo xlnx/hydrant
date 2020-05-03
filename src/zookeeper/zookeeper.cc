@@ -43,9 +43,12 @@ private:
 			while ( true ) {
 				MpiInst cmd;
 				MPI_Status stat;
-				MPI_Recv( &cmd, sizeof( cmd ), MPI_CHAR, 1, tag, MPI_COMM_WORLD, &stat );
+				const int leader_rank = 1;
+				MPI_Recv( &cmd, sizeof( cmd ), MPI_CHAR, leader_rank,
+						  tag, MPI_COMM_WORLD, &stat );
 				auto pkt = get_packet( send_buf, cmd.len, 0 );
-				MPI_Recv( pkt, cmd.len, MPI_CHAR, 1, tag, MPI_COMM_WORLD, &stat );
+				MPI_Recv( pkt, cmd.len, MPI_CHAR, leader_rank,
+						  tag, MPI_COMM_WORLD, &stat );
 				send_packet( pkt, cmd.len, wspp::frame::opcode::BINARY );
 			}
 		} catch ( std::exception const &e ) {

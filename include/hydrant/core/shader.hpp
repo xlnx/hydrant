@@ -34,6 +34,14 @@ VM_EXPORT
 	struct IShader : IShaderTypeErased
 	{
 		using Pixel = P;
+
+		__host__ __device__ void init( P &pixel, Ray const &ray ) const
+		{
+		}
+		
+		__host__ __device__ void miss( P &pixel ) const
+		{
+		}
 	};
 }
 
@@ -101,6 +109,7 @@ __host__ __device__ void
 	P pixel = {};
 	F const &shader = *reinterpret_cast<F const *>( shader_in );
 
+	shader.init( pixel, ray_in );
 	pixel.ray = ray_in;
 	float tnear, tfar;
 	if ( pixel.ray.intersect( shader.bbox, tnear, tfar ) ) {
@@ -109,6 +118,7 @@ __host__ __device__ void
 		shader.main( pixel );
 	} else {
 		pixel.nsteps = 0;
+		shader.miss( pixel );
 	}
 
 	*reinterpret_cast<P *>( pixel_out ) = pixel;
