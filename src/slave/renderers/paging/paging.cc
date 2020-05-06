@@ -54,6 +54,7 @@ bool PagingRenderer::init( std::shared_ptr<Dataset> const &dataset,
 cufx::Image<> PagingRenderer::offline_render_ctxed( OfflineRenderCtx &ctx, Camera const &camera )
 {
 	auto film = create_film();
+	film.update_device_view();
 	return film.fetch_data().dump();
 }
 

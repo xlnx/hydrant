@@ -42,6 +42,10 @@ VM_EXPORT
 		__host__ __device__ void miss( P &pixel ) const
 		{
 		}
+
+		__host__ __device__ void fetch( P const &pixel, void *dst ) const
+		{
+		}
 	};
 }
 
@@ -49,7 +53,8 @@ enum ShadingPass
 {
 	RayEmit,
 	RayMarch,
-	Pixel
+	Pixel,
+	Fetch
 };
 
 struct ViewArgs
@@ -167,6 +172,24 @@ using pixel_shader_t = void( void const *, void *, void const * );
 template <typename P, typename F>
 __device__ pixel_shader_t *p_pixel_shader = pixel_shader_impl<P, F>;
 
+/* fetch shader */
+
+template <typename P, typename F>
+__host__ __device__ void
+fetch_shader_impl( void const *pixel_in, void *pixel_out, void const *shader_in )
+{
+	F const &shader = *reinterpret_cast<F const *>( shader_in );
+	auto &pixel_in_ = *reinterpret_cast<P const *>( pixel_in );
+	//	auto &pixel_out_ = *reinterpret_cast<uchar3 *>( pixel_out );
+
+	shader.fetch( pixel_in_, pixel_out );
+}
+
+using fetch_shader_t = void( void const *, void *, void const * );
+
+template <typename P, typename F>
+__device__ fetch_shader_t *p_fetch_shader = fetch_shader_impl<P, F>;
+
 /* kernel args defination */
 
 struct BasicKernelArgs
@@ -190,6 +213,11 @@ struct BasicPixelKernelArgs : BasicKernelArgs
 	tvec3<unsigned char> clear_color;
 };
 
+struct BasicFetchKernelArgs : BasicKernelArgs
+{
+	ImageDesc dst_desc;
+};
+
 struct CpuKernelLauncher
 {
 	function_ptr_t launcher;
@@ -208,6 +236,10 @@ struct CpuPixelKernelArgs : BasicPixelKernelArgs, CpuKernelLauncher
 {
 };
 
+struct CpuFetchKernelArgs : BasicFetchKernelArgs, CpuKernelLauncher
+{
+};
+
 struct CudaShadingKernelLauncher
 {
 	DeviceFunctionDesc function_desc;
@@ -222,6 +254,10 @@ struct CudaRayMarchKernelArgs : BasicRayMarchKernelArgs, CudaShadingKernelLaunch
 };
 
 struct CudaPixelKernelArgs : BasicPixelKernelArgs, CudaShadingKernelLauncher
+{
+};
+
+struct CudaFetchKernelArgs : BasicFetchKernelArgs, CudaShadingKernelLauncher
 {
 };
 
@@ -247,6 +283,7 @@ struct CpuShadingArgs
 extern cufx::Kernel<void( CudaRayEmitKernelArgs args )> ray_emit_kernel;
 extern cufx::Kernel<void( CudaRayMarchKernelArgs args )> ray_march_kernel;
 extern cufx::Kernel<void( CudaPixelKernelArgs args )> pixel_kernel;
+extern cufx::Kernel<void( CudaFetchKernelArgs args )> fetch_kernel;
 
 extern void ray_emit_task_dispatch( ThreadPoolInfo const &thread_pool_info,
 									CpuRayEmitKernelArgs const &args );
@@ -254,6 +291,8 @@ extern void ray_march_task_dispatch( ThreadPoolInfo const &thread_pool_info,
 									 CpuRayMarchKernelArgs const &args );
 extern void pixel_task_dispatch( ThreadPoolInfo const &thread_pool_info,
 								 CpuPixelKernelArgs const &args );
+extern void fetch_task_dispatch( ThreadPoolInfo const &thread_pool_info,
+								 CpuFetchKernelArgs const &args );
 
 struct ShaderRegistrar
 {
@@ -290,6 +329,7 @@ struct ShaderRegistrar
 				HYDRANT_CUDA_SHADER_IMPL_PASS( RayEmit, ray_emit );
 				HYDRANT_CUDA_SHADER_IMPL_PASS( RayMarch, ray_march );
 				HYDRANT_CUDA_SHADER_IMPL_PASS( Pixel, pixel );
+				HYDRANT_CUDA_SHADER_IMPL_PASS( Fetch, fetch );
 #undef HYDRANT_CUDA_SHADER_IMPL_PASS
 			}
 			return ShadingResult::Ok;
@@ -314,6 +354,7 @@ struct ShaderRegistrar
 				HYDRANT_CPU_SHADER_IMPL_PASS( RayEmit, ray_emit );
 				HYDRANT_CPU_SHADER_IMPL_PASS( RayMarch, ray_march );
 				HYDRANT_CPU_SHADER_IMPL_PASS( Pixel, pixel );
+				HYDRANT_CPU_SHADER_IMPL_PASS( Fetch, fetch );
 #undef HYDRANT_CPU_SHADER_IMPL_PASS
 			}
 			return ShadingResult::Ok;

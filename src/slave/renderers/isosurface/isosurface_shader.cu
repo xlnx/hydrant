@@ -39,6 +39,15 @@ struct IsosurfaceShaderKernel : IsosurfaceShader
 	}
 
 	__host__ __device__ void
+	  fetch( Pixel const &pixel_in, void *pixel_out_ ) const
+	{
+		auto pixel_out = reinterpret_cast<IsosurfaceFetchPixel *>( pixel_out_ );
+		auto val = saturate( pixel_in.v );
+		pixel_out->val = uchar3{ val.x, val.y, val.z };
+		pixel_out->depth = pixel_in.depth;
+	}
+
+	__host__ __device__ void
 	  main( Pixel &pixel_in_out ) const
 	{
 		auto pixel = pixel_in_out;

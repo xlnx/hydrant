@@ -14,6 +14,12 @@ struct IsosurfacePixel : StdVec4Pixel
 	float depth;
 };
 
+struct IsosurfaceFetchPixel
+{
+	uchar3 val;
+	float depth;
+};
+
 struct IsosurfaceShader : IShader<IsosurfacePixel>
 {
 	IsosurfaceRenderMode mode;

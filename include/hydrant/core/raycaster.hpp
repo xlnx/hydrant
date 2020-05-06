@@ -98,6 +98,29 @@ VM_EXPORT
 				return cast_cpu_impl( &kernel_args, f, opts );
 			}
 		}
+		
+		template <typename P1, typename P2, typename F>
+		void fetch_pass( cufx::ImageView<P1> &img,
+						 cufx::ImageView<P2> &dst,
+						 F const &f,
+						 RaycastingOptions const &opts )
+		{
+			if ( opts.device.has_value() ) {
+				CudaFetchKernelArgs kernel_args;
+				kernel_args.shading_pass = ShadingPass::Fetch;
+				kernel_args.image_desc.create_from_img( img, true );
+				kernel_args.dst_desc.create_from_img( dst, true );
+
+				return cast_cuda_impl( &kernel_args, f, opts );
+			} else {
+				CpuFetchKernelArgs kernel_args;
+				kernel_args.shading_pass = ShadingPass::Fetch;
+				kernel_args.image_desc.create_from_img( img, false );
+				kernel_args.dst_desc.create_from_img( dst, false );
+
+				return cast_cpu_impl( &kernel_args, f, opts );
+			}
+		}
 
 	private:
 		void fill_ray_emit_args( BasicRayEmitKernelArgs &args,

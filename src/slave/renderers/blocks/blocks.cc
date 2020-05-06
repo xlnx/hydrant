@@ -67,6 +67,7 @@ cufx::Image<> BlocksRenderer::offline_render_ctxed( OfflineRenderCtx &ctx, Camer
 							 shader,
 							 RaycastingOptions{}
 							   .set_device( device ) );
+	film.update_device_view();
 	return film.fetch_data().dump();
 }
 

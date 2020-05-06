@@ -132,6 +132,7 @@ cufx::Image<> VolumeRenderer::offline_render_ctxed( OfflineRenderCtx &ctx_in, Ca
 						  shader,
 						  opts );
 
+	frame.update_device_view();
 	return frame.fetch_data();
 }
 

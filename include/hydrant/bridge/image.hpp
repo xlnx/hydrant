@@ -34,10 +34,23 @@ VM_EXPORT
 		cufx::ImageView<P> &view() const { return img->view; }
 		cufx::Image<P> get() const { return img->img; }
 
+		void update_device_view() const 
+		{
+			need_fetch = true;
+		}
+		
 		cufx::Image<P> fetch_data() const
 		{
-			if ( cuda ) { img->view.copy_from_device().launch(); }
+			if ( cuda && need_fetch ) {
+				img->view.copy_from_device().launch();
+				need_fetch = false;
+			}
 			return img->img;
+		}
+
+		std::size_t bytes() const
+		{
+			return img->view.width() * img->view.height() * sizeof( P );
 		}
 
 	private:
@@ -54,6 +67,7 @@ VM_EXPORT
 		};
 
 	private:
+		mutable bool need_fetch = false;
 		std::shared_ptr<Img> img;
 		std::shared_ptr<Cuda> cuda;
 	};

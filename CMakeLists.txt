@@ -64,3 +64,6 @@ install(DIRECTORY configs
   DESTINATION .
   COMPONENT runtime
 )
+install(FILES build_dataset.sh
+  DESTINATION .
+)
