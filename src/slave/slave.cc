@@ -20,6 +20,7 @@ struct Session : IRenderLoop
 		renderer( RendererFactory( path ).create( cfg.params.render ) ),
 		tag( tag )
 	{
+		vm::println( "session #{} started", tag );
 		worker = std::thread( [this] {
 				this->renderer->realtime_render( *this,
 												 RealtimeRenderOptions{}
@@ -32,6 +33,7 @@ struct Session : IRenderLoop
 	{
 		stop = true;
 		worker.join();
+		vm::println( "session #{} exited", tag );
 	}
 	
 public:
@@ -97,8 +99,11 @@ public:
 				is >> cfg;
 				sessions.emplace( cmd.tag,
 								  vm::Box<Session>( new Session( comm, cmd.tag, cfg ) ) );
-			} else {
+			} else if ( cmd.len ) {
 				it->second->update( payload );
+			} else {
+				// empty packet for close session
+				sessions.erase( it );
 			}
 		}
 		

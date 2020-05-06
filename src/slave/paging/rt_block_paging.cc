@@ -266,7 +266,7 @@ RtBlockPagingServerImpl::RtBlockPagingServerImpl( RtBlockPagingServerOptions con
 			} else if ( redundant_idxs.size() ) {
 				auto swap_idx = redundant_idxs.back();
 				redundant_idxs.pop_back();
-				LOG( INFO ) << vm::fmt( "swap +{} -{}", idx, swap_idx );
+				//				LOG( INFO ) << vm::fmt( "swap +{} -{}", idx, swap_idx );
 				present_idxs.erase( swap_idx );
 				auto uvec3_idx = uvec3( swap_idx.x, swap_idx.y, swap_idx.z );
 				auto &swap_vaddr = vaddr_buf[ uvec3_idx ];

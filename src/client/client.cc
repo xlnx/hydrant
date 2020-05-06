@@ -94,7 +94,7 @@ private:
 	static void g_on_open( wspp::connection_hdl hdl )
 	{
 		g_clt->hdl = hdl;
-		g_clt->is_connected.store( true );
+		g_clt->is_connected = true;
 		g_clt->on_open();
 	}
 	
@@ -181,7 +181,7 @@ private:
 	void update_config()
 	{
 		// if the connection hasn't been established, skip
-		if ( is_connected.load() ) {
+		if ( is_connected ) {
 			auto writer = vm::json::Writer{}.set_pretty( false );
 			static std::string cfg_str;
 			auto new_cfg_str = writer.write( config );
@@ -294,12 +294,12 @@ private:
 	vm::Box<IUi> ctrl_ui;
 	client wsc;
 	wspp::connection_hdl hdl;
-	std::atomic<bool> is_connected;
 	std::mutex frame_mtx;
 	std::string payload_buf;
 	const char *frame_ptr = nullptr;
 	
 	Config config;
+    bool is_connected = false;
 	std::thread worker;
 	
 	double prev = NAN;
