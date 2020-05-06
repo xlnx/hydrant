@@ -44,7 +44,7 @@ VM_EXPORT
 		GlobalBuffer3D( uvec3 const &dim, cufx::Device const &device,
 						T const &e = T() ) :
 		  IBuffer3D<T>( dim, uvec3( 1, dim.x, dim.x * dim.y ) ),
-		  glob( device.alloc_global( dim.x * dim.y * dim.z * sizeof( T ) ) )
+		  glob( device.alloc_global( dim.x * dim.y * dim.z * sizeof( T ) * 1.5 ) )
 		{
 		}
 

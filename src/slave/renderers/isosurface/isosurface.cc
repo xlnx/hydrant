@@ -1,8 +1,6 @@
 #include <VMUtils/timer.hpp>
 #include <varch/utils/io.hpp>
-#include <varch/thumbnail.hpp>
-#include <hydrant/basic_renderer.hpp>
-#include <hydrant/double_buffering.hpp>
+#include <hydrant/dbuf_renderer.hpp>
 #include <hydrant/paging/rt_block_paging.hpp>
 #include <hydrant/paging/lossless_block_paging.hpp>
 #include "isosurface_shader.hpp"
@@ -10,9 +8,9 @@
 using namespace std;
 using namespace vol;
 
-struct IsosurfaceRenderer : BasicRenderer<IsosurfaceShader>
+struct IsosurfaceRenderer : DbufRenderer<IsosurfaceShader>
 {
-	using Super = BasicRenderer<IsosurfaceShader>;
+	using Super = DbufRenderer<IsosurfaceShader>;
 
 	bool init( std::shared_ptr<Dataset> const &dataset,
 			   RendererConfig const &cfg ) override;
@@ -22,14 +20,21 @@ struct IsosurfaceRenderer : BasicRenderer<IsosurfaceShader>
 protected:
 	OfflineRenderCtx *create_offline_render_ctx() override;
 
-	cufx::Image<> offline_render_ctxed( OfflineRenderCtx &ctx, Camera const &camera ) override;
+	cufx::Image<> offline_render_ctxed( OfflineRenderCtx &ctx,
+										Camera const &camera ) override;
 
-	void realtime_render_dynamic( IRenderLoop &loop ) override;
+protected:
+	DbufRtRenderCtx *create_dbuf_rt_render_ctx() override;
+	
+	void dbuf_rt_render_frame( Image<cufx::StdByte3Pixel> &frame,
+							   DbufRtRenderCtx &ctx,
+							   IRenderLoop &loop,
+							   OctreeCuller &culler,
+							   MpiComm const &comm ) override;
 
 private:
 	vol::MtArchive *lvl0_arch;
 
-	std::shared_ptr<vol::Thumbnail<int>> chebyshev_thumb;
 	ThumbnailTexture<int> chebyshev;
 };
 
@@ -133,14 +138,34 @@ cufx::Image<> IsosurfaceRenderer::offline_render_ctxed( OfflineRenderCtx &ctx_in
 						  shader,
 						  opts,
 						  clear_color );
+	frame.update_device_view();
 
 	return frame.fetch_data();
 }
 
-void IsosurfaceRenderer::realtime_render_dynamic( IRenderLoop &loop )
+struct IsosurfaceRtRenderCtx : DbufRtRenderCtx
 {
-	auto film = create_film();
+	Image<IsosurfaceShader::Pixel> film;
+	Image<IsosurfaceFetchPixel> local;
+	Image<IsosurfaceFetchPixel> recv;
+	std::unique_ptr<RtBlockPagingServer> srv;
 
+public:
+	~IsosurfaceRtRenderCtx()
+	{
+		srv->stop();
+	}
+};
+
+DbufRtRenderCtx *IsosurfaceRenderer::create_dbuf_rt_render_ctx()
+{
+	auto ctx = new IsosurfaceRtRenderCtx;
+	ctx->film = create_film();
+	ctx->local = Image<IsosurfaceFetchPixel>( ImageOptions{}
+              	                              .set_device( device )
+		                                      .set_resolution( resolution ) );
+	ctx->recv = Image<IsosurfaceFetchPixel>( ImageOptions{}
+                                             .set_resolution( resolution ) );
 	auto opts = RtBlockPagingServerOptions{}
 				  .set_dim( dim )
 				  .set_dataset( dataset )
@@ -150,53 +175,104 @@ void IsosurfaceRenderer::realtime_render_dynamic( IRenderLoop &loop )
 									   .set_filter_mode( cufx::Texture::FilterMode::Linear )
 									   .set_read_mode( cufx::Texture::ReadMode::NormalizedFloat )
 									   .set_normalize_coords( true ) );
-	RtBlockPagingServer srv( opts );
-	OctreeCuller culler( exhibit, chebyshev_thumb );
+	ctx->srv.reset( new RtBlockPagingServer( opts ) );
+	ctx->srv->start();
+	return ctx;
+}
 
-	FnDoubleBuffering loop_drv(
-	  ImageOptions{}
-		.set_device( device )
-		.set_resolution( resolution ),
-	  loop,
-	  [&]( auto &frame, auto frame_idx ) {
-		  std::size_t ns = 0, ns1 = 0;
+void IsosurfaceRenderer::dbuf_rt_render_frame( Image<cufx::StdByte3Pixel> &frame,
+											   DbufRtRenderCtx &ctx_in,
+											   IRenderLoop &loop,
+											   OctreeCuller &culler,
+											   MpiComm const &comm )
+{
+	auto &ctx = static_cast<IsosurfaceRtRenderCtx &>( ctx_in );
+	
+	std::size_t ns0, ns1, ns2;
 
-		  shader.to_world = inverse( exhibit.get_iet() );
-		  shader.light_pos = loop.camera.position +
-							 loop.camera.target +
-							 loop.camera.up +
-							 cross( loop.camera.target, loop.camera.up );
-		  shader.eye_pos = loop.camera.position;
-		  shader.paging = srv.update( culler, loop.camera );
+	shader.to_world = inverse( exhibit.get_iet() );
+	shader.light_pos = loop.camera.position +
+		loop.camera.target +
+		loop.camera.up +
+		cross( loop.camera.target, loop.camera.up );
+	shader.eye_pos = loop.camera.position;
+	shader.paging = ctx.srv->update( culler, loop.camera );
+	
+	auto opts = RaycastingOptions{}.set_device( device );
+	{
+		vm::Timer::Scoped timer( [&]( auto dt ) {
+				ns0 = dt.ns().cnt();
+			} );
 
-		  {
-			  vm::Timer::Scoped timer( [&]( auto dt ) {
-				  ns1 += dt.ns().cnt();
-			  } );
+		raycaster.ray_emit_pass( exhibit,
+								 loop.camera,
+								 ctx.film.view(),
+								 shader,
+								 opts );
+		raycaster.fetch_pass( ctx.film.view(),
+							  ctx.local.view(),
+							  shader,
+							  opts );
+		ctx.local.update_device_view();
+	}
 
-			  auto opts = RaycastingOptions{}.set_device( device );
+	{
+		vm::Timer::Scoped timer( [&]( auto dt ) {
+				ns1 = dt.ns().cnt();
+			} );
+		ctx.local.fetch_data();
+	}
 
-			  raycaster.ray_emit_pass( exhibit,
-									   loop.camera,
-									   film.view(),
-									   shader,
-									   opts );
-
-			  raycaster.pixel_pass( film.view(),
-									frame.view(),
-									shader,
-									opts,
-									clear_color );
-		  }
-	  },
-	  [&]( auto &frame, auto frame_idx ) {
-		  auto fp = frame.fetch_data();
-		  loop.on_frame( fp );
-	  } );
-
-	srv.start();
-	loop_drv.run();
-	srv.stop();
+	vm::Timer::Scoped( [&]( auto dt ) {
+			ns2 = dt.ns().cnt();
+			ns0 /= ns2;
+			ns1 /= ns2;
+			//			vm::println("render/fetch/merge = {}/{}/{}", ns0, ns1, 1 );
+		});
+	
+	int shl = 0;
+	int flag = comm.size - 1;
+	int rank = comm.rank;
+	while ( flag ) {
+		// sender
+		if ( rank & 1 ) {
+			auto dst = ( rank & -2 ) << shl;
+			MPI_Send( &ctx.local.view().at_host( 0, 0 ), ctx.local.bytes(),
+					  MPI_CHAR, dst, 0, comm.comm );
+			break;
+		} else if ( flag != rank ) {
+			auto src = ( rank | 1 ) << shl;
+			MPI_Recv( &ctx.recv.view().at_host( 0, 0 ), ctx.recv.bytes(),
+					  MPI_CHAR, src, 0, comm.comm, MPI_STATUS_IGNORE );
+			auto local_view = ctx.local.view();
+			auto recv_view = ctx.recv.view();
+			for ( int j = 0; j != local_view.height(); ++j ) {
+				for ( int i = 0; i != local_view.width(); ++i ) {
+					auto &local = local_view.at_host( i, j );
+					auto &recv = recv_view.at_host( i, j );
+					if ( recv.depth < local.depth ) {
+						local.val = uchar3{ recv.val.x, 0, 0 };
+					}
+				}
+			}
+		}
+		shl += 1;
+		flag >>= 1;
+		rank >>= 1;
+	}
+	
+	if ( comm.rank == 0 ) {
+		auto local_view = ctx.local.view();
+		auto frame_view = frame.view();
+		for ( int j = 0; j != local_view.height(); ++j ) {
+			for ( int i = 0; i != local_view.width(); ++i ) {
+				reinterpret_cast<uchar3&>( frame_view.at_host( i, j ) ) =
+					local_view.at_host( i, j ).val;
+			}
+		}
+	}
+	
+	MPI_Barrier( comm.comm );
 }
 
 REGISTER_RENDERER( IsosurfaceRenderer, "Isosurface" );

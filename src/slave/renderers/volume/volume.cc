@@ -1,19 +1,16 @@
 #include <VMUtils/timer.hpp>
-#include <varch/thumbnail.hpp>
-#include <hydrant/double_buffering.hpp>
-#include <hydrant/unarchiver.hpp>
+#include <hydrant/dbuf_renderer.hpp>
 #include <hydrant/paging/rt_block_paging.hpp>
 #include <hydrant/paging/lossless_block_paging.hpp>
-#include <hydrant/basic_renderer.hpp>
 #include <hydrant/transfer_fn.hpp>
 #include "volume_shader.hpp"
 
 using namespace std;
 using namespace vol;
 
-struct VolumeRenderer : BasicRenderer<VolumeShader>
+struct VolumeRenderer : DbufRenderer<VolumeShader>
 {
-	using Super = BasicRenderer<VolumeShader>;
+	using Super = DbufRenderer<VolumeShader>;
 
 	bool init( std::shared_ptr<Dataset> const &dataset,
 			   RendererConfig const &cfg ) override;
@@ -23,15 +20,22 @@ struct VolumeRenderer : BasicRenderer<VolumeShader>
 protected:
 	OfflineRenderCtx *create_offline_render_ctx() override;
 
-	cufx::Image<> offline_render_ctxed( OfflineRenderCtx &ctx, Camera const &camera ) override;
+	cufx::Image<> offline_render_ctxed( OfflineRenderCtx &ctx,
+										Camera const &camera ) override;
 
-	void realtime_render_dynamic( IRenderLoop &loop ) override;
+protected:
+	DbufRtRenderCtx *create_dbuf_rt_render_ctx() override;
+	
+	void dbuf_rt_render_frame( Image<cufx::StdByte3Pixel> &frame,
+							   DbufRtRenderCtx &ctx,
+							   IRenderLoop &loop,
+							   OctreeCuller &culler,
+							   MpiComm const &comm ) override;
 
 private:
 	TransferFn transfer_fn;
 	vol::MtArchive *lvl0_arch;
 
-	std::shared_ptr<vol::Thumbnail<int>> chebyshev_thumb;
 	ThumbnailTexture<int> chebyshev;
 };
 
@@ -128,13 +132,26 @@ cufx::Image<> VolumeRenderer::offline_render_ctxed( OfflineRenderCtx &ctx_in, Ca
 						  shader,
 						  opts );
 
+	frame.update_device_view();
 	return frame.fetch_data();
 }
 
-void VolumeRenderer::realtime_render_dynamic( IRenderLoop &loop )
+struct VolumeRtRenderCtx : DbufRtRenderCtx
 {
-	auto film = create_film();
+	Image<VolumeShader::Pixel> film;
+	std::unique_ptr<RtBlockPagingServer> srv;
 
+public:
+	~VolumeRtRenderCtx()
+	{
+		srv->stop();
+	}
+};
+
+DbufRtRenderCtx *VolumeRenderer::create_dbuf_rt_render_ctx()
+{
+	auto ctx = new VolumeRtRenderCtx;
+	ctx->film = create_film();
 	auto opts = RtBlockPagingServerOptions{}
 				  .set_dim( dim )
 				  .set_dataset( dataset )
@@ -144,46 +161,41 @@ void VolumeRenderer::realtime_render_dynamic( IRenderLoop &loop )
 									   .set_filter_mode( cufx::Texture::FilterMode::Linear )
 									   .set_read_mode( cufx::Texture::ReadMode::NormalizedFloat )
 									   .set_normalize_coords( true ) );
-	RtBlockPagingServer srv( opts );
-	OctreeCuller culler( exhibit, chebyshev_thumb );
+	ctx->srv.reset( new RtBlockPagingServer( opts ) );
+	ctx->srv->start();
+	return ctx;
+}
 
-	FnDoubleBuffering loop_drv(
-	  ImageOptions{}
-		.set_device( device )
-		.set_resolution( resolution ),
-	  loop,
-	  [&]( auto &frame, auto frame_idx ) {
-		  std::size_t ns = 0, ns1 = 0;
+void VolumeRenderer::dbuf_rt_render_frame( Image<cufx::StdByte3Pixel> &frame,
+										   DbufRtRenderCtx &ctx_in,
+										   IRenderLoop &loop,
+										   OctreeCuller &culler,
+										   MpiComm const &comm )
+{
+	auto &ctx = static_cast<VolumeRtRenderCtx &>( ctx_in );
 
-		  shader.paging = srv.update( culler, loop.camera );
-
-		  {
-			  vm::Timer::Scoped timer( [&]( auto dt ) {
-				  ns1 += dt.ns().cnt();
-			  } );
-
-			  auto opts = RaycastingOptions{}.set_device( device );
-
-			  raycaster.ray_emit_pass( exhibit,
-									   loop.camera,
-									   film.view(),
-									   shader,
-									   opts );
-
-			  raycaster.pixel_pass( film.view(),
-									frame.view(),
-									shader,
-									opts );
-		  }
-	  },
-	  [&]( auto &frame, auto frame_idx ) {
-		  auto fp = frame.fetch_data();
-		  loop.on_frame( fp );
-	  } );
-
-	srv.start();
-	loop_drv.run();
-	srv.stop();
+	std::size_t ns = 0, ns1 = 0;
+	
+	shader.paging = ctx.srv->update( culler, loop.camera );
+	
+	{
+		vm::Timer::Scoped timer( [&]( auto dt ) {
+				ns1 += dt.ns().cnt();
+			} );
+		
+		auto opts = RaycastingOptions{}.set_device( device );
+		
+		raycaster.ray_emit_pass( exhibit,
+								 loop.camera,
+								 ctx.film.view(),
+								 shader,
+								 opts );
+		
+		raycaster.pixel_pass( ctx.film.view(),
+							  frame.view(),
+							  shader,
+							  opts );
+	}
 }
 
 REGISTER_RENDERER( VolumeRenderer, "Volume" );

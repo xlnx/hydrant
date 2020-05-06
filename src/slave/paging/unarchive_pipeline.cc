@@ -72,7 +72,8 @@ VM_EXPORT
 	{
 		auto pad_bs = unarchiver.padded_block_size();
 		if ( opts.device.has_value() ) {
-			buf.reset( new GlobalBuffer3D<unsigned char>( uvec3( pad_bs ), opts.device.value() ) );
+			buf.reset( new GlobalBuffer3D<unsigned char>( uvec3( pad_bs ),
+														  opts.device.value() ) );
 		} else {
 			buf.reset( new HostBuffer3D<unsigned char>( uvec3( pad_bs ) ) );
 		}
@@ -103,7 +104,7 @@ VM_EXPORT
 				auto lk = this->lock();
 				cv.wait( lk.lk, [&] { return should_stop || required.size(); } );
 				if ( should_stop ) { return; }
-				top_k = lk.top_k_idxs( 4 );
+				top_k = lk.top_k_idxs( 16 );
 			}
 			map<Idx, int> idx_lookup;
 			for ( int i = 0; i != top_k.size(); ++i ) {
@@ -126,7 +127,9 @@ VM_EXPORT
 							[&]( auto &a ) {
 								return a.first == idx;
 							} );
-						  required.erase( it );
+						  if ( it != required.end() ) {
+							  required.erase( it );
+						  }
 					  }
 					  if ( still_need[ sn_idx ].first.load() ) {
 						  on_data( idx, *buf );

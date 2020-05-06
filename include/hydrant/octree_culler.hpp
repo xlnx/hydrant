@@ -11,7 +11,8 @@ VM_BEGIN_MODULE( hydrant )
 
 struct BoundingBox
 {
-	vec3 min, max;
+	VM_DEFINE_ATTRIBUTE( ivec3, min );
+	VM_DEFINE_ATTRIBUTE( ivec3, max );
 };
 
 struct Frustum
@@ -26,11 +27,11 @@ struct Frustum
 
 	bool contains_fast( BoundingBox const &bbox ) const
 	{
-		vec3 const *vp[ 2 ] = { &bbox.min, &bbox.max };
+		vec3 const vp[ 2 ] = { bbox.min, bbox.max };
 		for ( int i = 0; i != 2; ++i ) {
 			for ( int j = 0; j != 2; ++j ) {
 				for ( int k = 0; k != 2; ++k ) {
-					if ( contains( vec3( vp[ i ]->x, vp[ j ]->y, vp[ k ]->z ) ) ) {
+					if ( contains( vec3( vp[ i ].x, vp[ j ].y, vp[ k ].z ) ) ) {
 						return true;
 					}
 				}
@@ -43,11 +44,11 @@ struct Frustum
 	{
 		strict = true;
 		bool res = false;
-		vec3 const *vp[ 2 ] = { &bbox.min, &bbox.max };
+		vec3 const vp[ 2 ] = { bbox.min, bbox.max };
 		for ( int i = 0; i != 2; ++i ) {
 			for ( int j = 0; j != 2; ++j ) {
 				for ( int k = 0; k != 2; ++k ) {
-					if ( contains( vec3( vp[ i ]->x, vp[ j ]->y, vp[ k ]->z ) ) ) {
+					if ( contains( vec3( vp[ i ].x, vp[ j ].y, vp[ k ].z ) ) ) {
 						res = true;
 					} else {
 						strict = false;
@@ -89,44 +90,59 @@ VM_EXPORT
 		  chebyshev_thumb( chebyshev_thumb ),
 		  dim( chebyshev_thumb->dim.x, chebyshev_thumb->dim.y, chebyshev_thumb->dim.z ),
 		  log_dim_up( log_2_up( dim.x ), log_2_up( dim.y ), log_2_up( dim.z ) ),
-		  dim_up( uvec3( 1 ) << log_dim_up )
+		  dim_up( ivec3( 1 ) << log_dim_up ),
+		  bbox{ { 0, 0, 0 }, { dim.x, dim.y, dim.z } }
 		{
 			// bboxs.resize( dim_up.x * dim_up.y * dim_up.z * 8 );
 			// dfs( root, vec3( 0 ), vec3( dim_up ), );
 		}
-
 	public:
-		std::vector<vol::Idx> cull( Camera const &camera,
-									std::size_t limit = std::numeric_limits<std::size_t>::max(),
-									ScreenRect const &rect = ScreenRect{} ) const
+		OctreeCuller &set_bbox( BoundingBox const &bbox )
 		{
-			std::vector<vol::Idx> res;
+			if ( all( greaterThanEqual( bbox.min, ivec3( 0 ) ) ) &&
+				 all( lessThanEqual( bbox.max, dim ) ) )
+			{
+				this->bbox = bbox;
+			} else {
+				LOG( FATAL ) << vm::fmt( "invalid bbox: {}", std::make_pair( bbox.min, bbox.max ) );
+			}
+		}
+
+		const std::vector<vol::Idx> &cull( Camera const &camera,
+										   std::size_t limit = std::numeric_limits<std::size_t>::max(),
+										   ScreenRect const &rect = ScreenRect{} )
+		{
 			auto itrans = exhibit.get_iet() * camera.get_ivt();
 			auto frust = get_frustrum( camera, rect, itrans );
+			buf.clear();
 			// for ( int i = 0; i < 4; ++i ) {
 			// 	vm::println( "+ {}, {}", frust.norm[ i ].o, frust.norm[ i ].d );
 			// }
-			chebyshev_thumb->iterate_3d(
-			  [&]( auto &idx ) {
-				  if ( ( *chebyshev_thumb )[ idx ] == 0 ) {
-					  auto x = vec3( idx.x, idx.y, idx.z );
-					  // bool strict;
-					  if ( frust.contains_fast( BoundingBox{ x, x + 1.f } ) ) {
-						  res.emplace_back( idx );
-					  }
-				  }
-			  } );
-			auto length = std::min( limit, res.size() );
+			vol::Idx idx;
+			for ( idx.z = bbox.min.z; idx.z != bbox.max.z; ++idx.z ) {
+				for ( idx.y = bbox.min.y; idx.y != bbox.max.y; ++idx.y ) {
+					for ( idx.x = bbox.min.x; idx.x != bbox.max.x; ++idx.x ) {
+						if ( ( *chebyshev_thumb )[ idx ] == 0 ) {
+							auto x = vec3( idx.x, idx.y, idx.z );
+							// bool strict;
+							if ( frust.contains_fast( BoundingBox{ x, x + 1.f } ) ) {
+								buf.emplace_back( idx );
+							}
+						}						
+					}
+				}
+			}
+			auto length = std::min( limit, buf.size() );
 			std::nth_element(
-			  res.begin(), res.begin() + length, res.end(),
+			  buf.begin(), buf.begin() + length, buf.end(),
 			  [&]( auto &a, auto &b ) {
 				  return distance2( frust.orig, vec3( a.x, a.y, a.z ) + .5f ) <
 						 distance2( frust.orig, vec3( b.x, b.y, b.z ) + .5f );
 			  } );
 			// vm::println( "{}", frust.norm[ 0 ].o );
-			res.resize( length );
-			std::sort( res.begin(), res.end() );
-			return res;
+			buf.resize( length );
+			std::sort( buf.begin(), buf.end() );
+			return buf;
 		}
 
 	private:
@@ -178,7 +194,9 @@ VM_EXPORT
 	private:
 		Exhibit exhibit;
 		std::shared_ptr<vol::Thumbnail<int>> chebyshev_thumb;
-		uvec3 dim, log_dim_up, dim_up;
+		ivec3 dim, log_dim_up, dim_up;
+		BoundingBox bbox;
+		std::vector<vol::Idx> buf;
 		std::unique_ptr<OctreeNode> root;
 	};
 }

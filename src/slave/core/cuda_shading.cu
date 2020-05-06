@@ -75,4 +75,24 @@ __global__ void
 
 CUFX_DEFINE_KERNEL( pixel_kernel, pixel_kernel_impl );
 
+/* Fetch Kernel Impl */
+
+__global__ void
+  fetch_kernel_impl( CudaFetchKernelArgs args )
+{
+	uint x = blockIdx.x * blockDim.x + threadIdx.x;
+	uint y = blockIdx.y * blockDim.y + threadIdx.y;
+
+	if ( x >= args.image_desc.resolution.x || y >= args.image_desc.resolution.y ) {
+		return;
+	}
+
+	auto shader = (fetch_shader_t *)args.function_desc.fp;
+	shader( args.image_desc.data + args.image_desc.pixel_size * ( args.image_desc.resolution.x * y + x ),
+			args.dst_desc.data + args.dst_desc.pixel_size * ( args.dst_desc.resolution.x * y + x ),
+			shader_args_buffer + args.function_desc.offset );
+}
+
+CUFX_DEFINE_KERNEL( fetch_kernel, fetch_kernel_impl );
+
 VM_END_MODULE()

@@ -8,7 +8,7 @@
 #include <VMUtils/json_binding.hpp>
 #include <VMUtils/nonnull.hpp>
 #include <hydrant/config.schema.hpp>
-#include <hydrant/mpi_command.hpp>
+#include <hydrant/mpi_utils.hpp>
 #include "zookeeper.hpp"
 
 using namespace std;
@@ -41,11 +41,14 @@ private:
 		try {
 			std::vector<char> send_buf;
 			while ( true ) {
-				MpiCommand cmd;
+				MpiInst cmd;
 				MPI_Status stat;
-				MPI_Recv( &cmd, sizeof( cmd ), MPI_CHAR, 1, tag, MPI_COMM_WORLD, &stat );
+				const int leader_rank = 1;
+				MPI_Recv( &cmd, sizeof( cmd ), MPI_CHAR, leader_rank,
+						  tag, MPI_COMM_WORLD, &stat );
 				auto pkt = get_packet( send_buf, cmd.len, 0 );
-				MPI_Recv( pkt, cmd.len, MPI_CHAR, 1, tag, MPI_COMM_WORLD, &stat );
+				MPI_Recv( pkt, cmd.len, MPI_CHAR, leader_rank,
+						  tag, MPI_COMM_WORLD, &stat );
 				send_packet( pkt, cmd.len, wspp::frame::opcode::BINARY );
 			}
 		} catch ( std::exception const &e ) {
@@ -75,11 +78,11 @@ public:
 				return;
 			}
 			std::string cfg_str = vm::json::Writer{}.set_pretty( false ).write( *config );
-			auto cmd = MpiCommand{}.set_tag( tag ).set_len( cfg_str.length() + 1 );
+			auto cmd = MpiInst{}.set_tag( tag ).set_len( cfg_str.length() + 1 );
 			cmd.bcast_header( 0 );
 			cmd.bcast_payload( 0, (void *)cfg_str.data() );
 		} else {			
-			auto cmd = MpiCommand{}.set_tag( tag ).set_len( msg->get_payload().length() );
+			auto cmd = MpiInst{}.set_tag( tag ).set_len( msg->get_payload().length() );
 			cmd.bcast_header( 0 );
 			cmd.bcast_payload( 0, (void *)msg->get_payload().data() );
 		}

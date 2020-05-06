@@ -4,7 +4,7 @@
 #include <GLFW/glfw3.h>
 #include <glog/logging.h>
 #include <VMUtils/json_binding.hpp>
-#include <hydrant/basic_renderer.hpp>
+//#include <hydrant/basic_renderer.hpp>
 #include <hydrant/config.schema.hpp>
 #include <hydrant/ui.hpp>
 #include <hydrant/glfw_render_loop.hpp>
@@ -94,7 +94,7 @@ private:
 	static void g_on_open( wspp::connection_hdl hdl )
 	{
 		g_clt->hdl = hdl;
-		g_clt->is_connected = true;
+		g_clt->is_connected.store( true );
 		g_clt->on_open();
 	}
 	
@@ -180,13 +180,16 @@ private:
 private:
 	void update_config()
 	{
-		auto writer = vm::json::Writer{}.set_pretty( false );
-		static std::string cfg_str;
-		auto new_cfg_str = writer.write( config );
-		if ( new_cfg_str != cfg_str ) {
-			// TODO: need lock on config
-			wsc.send( hdl, new_cfg_str, wspp::frame::opcode::TEXT );
-			cfg_str = std::move( new_cfg_str );
+		// if the connection hasn't been established, skip
+		if ( is_connected.load() ) {
+			auto writer = vm::json::Writer{}.set_pretty( false );
+			static std::string cfg_str;
+			auto new_cfg_str = writer.write( config );
+			if ( new_cfg_str != cfg_str ) {
+				// TODO: need lock on config
+				wsc.send( hdl, new_cfg_str, wspp::frame::opcode::TEXT );
+				cfg_str = std::move( new_cfg_str );
+			}
 		}
 	}
 	
@@ -291,7 +294,7 @@ private:
 	vm::Box<IUi> ctrl_ui;
 	client wsc;
 	wspp::connection_hdl hdl;
-	bool is_connected = false;
+	std::atomic<bool> is_connected;
 	std::mutex frame_mtx;
 	std::string payload_buf;
 	const char *frame_ptr = nullptr;

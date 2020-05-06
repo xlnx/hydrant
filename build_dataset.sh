@@ -1,22 +1,66 @@
 #!/bin/sh
 
-raw_path=$1
-dst_dir=$2
+OPTIND=1
 
-toolkit_dir=./build/external_build/varch/tools
-tmp_dir=/tmp/downsample
+raw_path=""
+dst_dir=./ds
+log_bs=6
+pad=2
+lvls=3
+
+toolkit_dir=./bin
+tmp_dir=.ds_tmp
 
 dx=256
 dy=256
 dz=256
 
-log_bs=6
-pad=2
+show_help() {
+	echo "Usage: $(basename $0) -hio"
+	echo "  -h: show help"
+	echo "  -i <path>: raw input file path"
+	echo "  -o <path>: output directory"
+	echo "  -b <int>: log(block_size)"
+	echo "  -p <int>: padding"
+	echo "  -l <int>: sample levels"
+}
 
-lvls=1
+while getopts "h?i:o:b:p:l:" opt; do
+	case "$opt" in
+		h|\?)
+			show_help
+			exit 0
+			;;
+		i)  raw_path=$OPTARG
+			;;
+		o)  dst_dir=$OPTARG
+			;;
+		b)  log_bs=$OPTARG
+			;;
+		p)  pad=$OPTARG
+			;;
+		l)  lvls=$OPTARG
+			;;
+	esac
+done
+
+if [ -z "$raw_path" ]; then
+	show_help
+	exit 0
+fi
+
+if [ ! -f "$raw_path" ]; then
+	echo "raw path '$raw_path' does not exist"
+	exit 0
+fi
+
+shift $((OPTIND-1))
+[ "${1:-}" = "--" ] && shift
+
 
 raw_base=$(basename ${raw_path})
 
+echo "padding=$pad; block_size=$(($log_bs))"
 echo "building ${dst_dir}..."
 
 mkdir -p ${tmp_dir}
@@ -46,7 +90,12 @@ lvl_arch ${raw_path} $dx $dy $dz
 
 for i in $(seq ${lvls})
 do
-    echo "sampling level $i/${lvls}..."
+	xx=$(($dx >> ($i-1)))
+	yy=$(($dy >> ($i-1)))
+	zz=$(($dz >> ($i-1)))
+
+	mb=$(($xx*$yy*$zz / 1024 / 1024))
+    echo "sampling level $i/${lvls}... [$xx, $yy, $zz] = $mb MB"
 
     ${toolkit_dir}/downsampler -i ${raw_path} -x $dx -y $dy -z $dz -s $i -o ${tmp_dir}\
         >> ${tmp_dir}/downsampler.log

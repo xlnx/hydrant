@@ -17,11 +17,6 @@ VM_EXPORT
 
 	VM_ENUM( RealtimeRenderQuality,
 			 Lossless, Dynamic );
-
-	struct RealtimeRenderOptions : vm::json::Serializable<RealtimeRenderOptions>
-	{
-		VM_JSON_FIELD( RealtimeRenderQuality, quality ) = RealtimeRenderQuality::Dynamic;
-	};
 }
 
 VM_END_MODULE()

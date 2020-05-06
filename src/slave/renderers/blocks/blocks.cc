@@ -19,7 +19,8 @@ struct BlocksRenderer : BasicRenderer<BlocksShader>
 
 	void update( vm::json::Any const &params ) override;
 
-	cufx::Image<> offline_render_ctxed( OfflineRenderCtx &ctx, Camera const &camera ) override;
+	cufx::Image<> offline_render_ctxed( OfflineRenderCtx &ctx,
+										Camera const &camera ) override;
 
 private:
 	ThumbnailTexture<int> chebyshev;
@@ -66,6 +67,7 @@ cufx::Image<> BlocksRenderer::offline_render_ctxed( OfflineRenderCtx &ctx, Camer
 							 shader,
 							 RaycastingOptions{}
 							   .set_device( device ) );
+	film.update_device_view();
 	return film.fetch_data().dump();
 }
 
