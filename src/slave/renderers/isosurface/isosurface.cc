@@ -227,7 +227,7 @@ void IsosurfaceRenderer::dbuf_rt_render_frame( Image<cufx::StdByte3Pixel> &frame
 			ns2 = dt.ns().cnt();
 			ns0 /= ns2;
 			ns1 /= ns2;
-			vm::println("render/fetch/merge = {}/{}/{}", ns0, ns1, 1 );
+			//			vm::println("render/fetch/merge = {}/{}/{}", ns0, ns1, 1 );
 		});
 	
 	int shl = 0;
@@ -251,7 +251,7 @@ void IsosurfaceRenderer::dbuf_rt_render_frame( Image<cufx::StdByte3Pixel> &frame
 					auto &local = local_view.at_host( i, j );
 					auto &recv = recv_view.at_host( i, j );
 					if ( recv.depth < local.depth ) {
-						local.val = recv.val;							
+						local.val = uchar3{ recv.val.x, 0, 0 };
 					}
 				}
 			}
