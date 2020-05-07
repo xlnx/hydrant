@@ -29,10 +29,11 @@ VM_EXPORT
 	public:
 		Texture1D() = default;
 
-		Texture1D( Texture1DOptions const &opts ) :
-		  opts( opts )
+		Texture1D( Texture1DOptions const &tex_opts ) :
+		  opts( tex_opts )
 		{
 			if ( opts.device.has_value() ) {
+				opts.opts.device = opts.device.value();
 				auto arr = opts.device.value().alloc_arraynd<CudaVec, 1>( opts.length );
 				cuda.reset( new Cuda{ arr, cufx::Texture( arr, opts.opts ) } );
 			} else {

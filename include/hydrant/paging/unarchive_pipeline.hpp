@@ -86,11 +86,12 @@ VM_EXPORT
 		std::mutex mut;
 		std::condition_variable cv;
 		std::vector<std::pair<vol::Idx, float>> required;
+		vm::Option<cufx::Device> device;
 		using StillNeed = std::pair<std::atomic_bool, vol::Idx>;
 		std::unique_ptr<StillNeed[]> still_need;
 		std::size_t curr_batch_size = 0;
 		std::unique_ptr<IBuffer3D<unsigned char>> buf;
-		std::unique_ptr<std::thread> worker;
+		std::unique_ptr<cufx::WorkerThread> worker;
 	};
 
 	struct FnUnarchivePipeline : IUnarchivePipeline

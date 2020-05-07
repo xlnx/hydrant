@@ -15,6 +15,7 @@ VM_EXPORT
 	{
 		IDoubleBuffering( ImageOptions const &opts, IRenderLoop &loop ) :
 		  frames{ opts, opts },
+		  device( opts.device ),
 		  loop( loop )
 		{
 		}
@@ -28,6 +29,7 @@ VM_EXPORT
 
 	private:
 		std::array<Image<cufx::StdByte3Pixel>, 2> frames;
+		vm::Option<cufx::Device> device;
 		IRenderLoop &loop;
 	};
 

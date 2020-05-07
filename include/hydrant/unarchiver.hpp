@@ -21,11 +21,26 @@ public:
 
 VM_EXPORT
 {
+	struct UnarchiverOptions
+	{
+		VM_DEFINE_ATTRIBUTE( std::string, path );
+		VM_DEFINE_ATTRIBUTE( vm::Option<cufx::Device>, device );
+	};
+	
 	struct Unarchiver : private UnarchiverImpl, public vol::Unarchiver
 	{
-		Unarchiver( std::string const &path ) :
-		  UnarchiverImpl( path ),
-		  vol::Unarchiver( reader )
+		Unarchiver( UnarchiverOptions const &opts ) :
+		  UnarchiverImpl( opts.path ),
+		  vol::Unarchiver( reader,
+						   [&opts] {
+							   auto dec_opts = vol::DecodeOptions{};
+							   if ( opts.device.has_value() ) {
+								   dec_opts
+									   .set_device( vol::ComputeDevice::Cuda )
+									   .set_device_id( opts.device.value().id() );
+							   }
+							   return dec_opts;
+						   } () )
 		{
 		}
 	};

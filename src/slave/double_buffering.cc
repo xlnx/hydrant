@@ -13,7 +13,7 @@ VM_EXPORT
 
 		loop.post_loop();
 
-		std::thread _( [&] {
+		cufx::WorkerThread _( [&] {
 			while ( should_continue ) {
 				std::unique_lock<std::mutex> lk( mut );
 				cv.wait( lk, [&] { return !( should_continue = !loop.should_stop() ) ||
@@ -29,7 +29,7 @@ VM_EXPORT
 				lk.unlock();
 				cv.notify_one();
 			}
-		} );
+		}, device );
 
 		while ( should_continue = !loop.should_stop() ) {
 			std::unique_lock<std::mutex> lk( mut );

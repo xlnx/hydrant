@@ -1,6 +1,5 @@
 #pragma once
 
-#include <regex>
 #include <glog/logging.h>
 #include <varch/thumbnail.hpp>
 #include <cudafx/device.hpp>
@@ -42,21 +41,16 @@ VM_EXPORT
 
 			auto params = cfg.params.get<BasicRendererParams>();
 			if ( params.device == ShadingDevice::Cuda ) {
-				try {
-					std::regex filter( params.device_filter );
-					auto devices = cufx::Device::scan();
-					for ( auto &device : devices ) {
-						auto props = device.props();
-						if ( std::regex_match( props.name, filter ) ) {
-							LOG( INFO ) << vm::fmt( "{}", props.name );
-						}
+				auto devices = cufx::Device::scan();
+				if ( !devices.size() ) {
+					LOG( ERROR ) << vm::fmt( "cuda device not found, fallback to cpu render mode" );
+				} else {
+					if ( params.comm_rank >= devices.size() ) {
+						LOG( FATAL ) << vm::fmt( "comm_rank >= devices.size()" );
+					} else {
+						device = devices[ params.comm_rank ];
+						lk = device.value().lock();
 					}
-					device = cufx::Device::get_default();
-					if ( !device.has_value() ) {
-						LOG( ERROR ) << vm::fmt( "cuda device not found, fallback to cpu render mode" );
-					}
-				} catch ( std::regex_error &e ) {
-					LOG( FATAL ) << vm::fmt( "invalid regex: '{}'", params.device_filter );
 				}
 			}
 			shader.max_steps = params.max_steps;
@@ -92,6 +86,10 @@ VM_EXPORT
 	public:
 		cufx::Image<> offline_render( Camera const &camera ) override final
 		{
+			vm::Option<cufx::Device::Lock> lk;
+			if ( device.has_value() ) {
+				lk = device.value().lock();
+			}
 			std::unique_ptr<OfflineRenderCtx> pctx( create_offline_render_ctx() );
 			return offline_render_ctxed( *pctx, camera );
 		}
@@ -107,6 +105,10 @@ VM_EXPORT
 	public:
 		void realtime_render( IRenderLoop &loop, RealtimeRenderOptions const &opts ) override final
 		{
+			vm::Option<cufx::Device::Lock> lk;
+			if ( device.has_value() ) {
+				lk = device.value().lock();
+			}
 			switch ( opts.quality._to_integral() ) {
 			case RealtimeRenderQuality::Lossless: {
 				realtime_render_lossless( loop, opts.comm );
@@ -170,6 +172,8 @@ VM_EXPORT
 		uvec3 dim;
 		Shader shader;
 		Exhibit exhibit;
+	private:
+		vm::Option<cufx::Device::Lock> lk;
 	};
 }
 

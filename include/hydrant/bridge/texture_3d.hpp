@@ -34,6 +34,7 @@ VM_EXPORT
 		  opts( new Texture3DOptions( tex_opts ) )
 		{
 			if ( opts->device.has_value() ) {
+				opts->opts.device = opts->device.value();
 				auto arr = opts->device.value()
 							 .alloc_arraynd<CudaVec, 3>( cufx::Extent{}
 														   .set_width( opts->dim.x )
@@ -103,7 +104,7 @@ VM_EXPORT
 								   f.wait();
 								   auto res = f.get();
 								   if ( !res.ok() ) {
-									   LOG( ERROR ) << vm::fmt( "source texture failed: {}", res.message() );
+									   LOG( FATAL ) << vm::fmt( "source texture failed: {}", res.message() );
 									   return false;
 								   }
 								   if ( cuda ) { cuda->tex = cufx::Texture( cuda->arr, opts->opts ); }

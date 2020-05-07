@@ -13,11 +13,16 @@ VM_BEGIN_MODULE( hydrant )
 
 struct Session : IRenderLoop
 {
-	Session( MpiComm const &comm, int32_t tag, Config const &cfg ) :
+	Session( MpiComm const &comm, int32_t tag, Config &cfg ) :
 		IRenderLoop( cfg.params.camera ),
 		comm( comm ),
 		path( cfg.data_path ),
-		renderer( RendererFactory( path ).create( cfg.params.render ) ),
+		renderer( [&] {
+				auto params = cfg.params.render.params.get<BasicRendererParams>();
+				params.comm_rank = comm.rank;
+				cfg.params.render.params.update( params );
+				return RendererFactory( path ).create( cfg.params.render );
+			} () ),
 		tag( tag )
 	{
 		vm::println( "session #{} started", tag );
