@@ -75,8 +75,6 @@ struct RtBlockPagingServerImpl
 	RtBlockPagingServerImpl( RtBlockPagingServerOptions const &opts );
 
 public:
-	MtArchive const *sample_level( size_t level ) const;
-
 	shared_ptr<IBuffer3D<unsigned char>> alloc_block_buf( size_t pad_bs );
 
 	void update( OctreeCuller &culler, Camera const &camera );
@@ -86,7 +84,6 @@ public:
 public:
 	RtBlockPagingServerOptions opts;
 	size_t max_block_count;
-	MtArchive *lvl0_arch;
 
 	vector<LowestLevelBlock> lowest_blocks;
 
@@ -108,14 +105,6 @@ public:
 	BlockPaging client;
 };
 
-MtArchive const *RtBlockPagingServerImpl::sample_level( size_t level ) const
-{
-	auto lp = opts.dataset->meta.sample_levels.find( level );
-	if ( lp == opts.dataset->meta.sample_levels.end() ) { return nullptr; }
-	// TODO: select archive
-	return &lp->second.archives[ 0 ];
-}
-
 shared_ptr<IBuffer3D<unsigned char>> RtBlockPagingServerImpl::alloc_block_buf( std::size_t pad_bs )
 {
 	shared_ptr<IBuffer3D<unsigned char>> buf;
@@ -129,26 +118,28 @@ shared_ptr<IBuffer3D<unsigned char>> RtBlockPagingServerImpl::alloc_block_buf( s
 
 void RtBlockPagingServerImpl::unarchive_lowest_level()
 {
+	auto &lvl0 = opts.dataset->meta.sample_levels[ 0 ];
+	
 	auto level = opts.dataset->meta.sample_levels.size() - 1;
-	auto &arch = *sample_level( level );
+	auto &arch = opts.dataset->meta.sample_levels[ level ];
 
-	auto nblk_x = ( 1 << level ) * arch.block_size;
-	auto nblk_y = lvl0_arch->block_size;
+	auto nblk_x = ( 1 << level ) * opts.dataset->meta.block_size;
+	auto nblk_y = opts.dataset->meta.block_size;
 	if ( nblk_x % nblk_y != 0 ) {
 		LOG( FATAL ) << "nblk_x % nblk_y != 0";
 	}
 
 	auto nblk_scale = nblk_x / nblk_y;
-	auto pad_bs = arch.padding * 2 + arch.block_size;
+	auto pad_bs = opts.dataset->meta.padding * 2 + opts.dataset->meta.block_size;
 	auto buf = alloc_block_buf( pad_bs );
 	auto storage_opts = Texture3DOptions{}
 						  .set_dim( pad_bs )
 						  .set_device( opts.device )
 						  .set_opts( opts.storage_opts );
 
-	auto bs_0 = lvl0_arch->block_size;
-	auto pad_0 = lvl0_arch->padding;
-	auto pad_bs_0 = lvl0_arch->block_size + 2 * pad_0;
+	auto bs_0 = opts.dataset->meta.block_size;
+	auto pad_0 = opts.dataset->meta.padding;
+	auto pad_bs_0 = opts.dataset->meta.block_size + 2 * pad_0;
 	auto k = float( bs_0 ) / pad_bs_0 / nblk_scale;
 	auto b0 = vec3( float( pad_0 ) / pad_bs_0 );
 
@@ -207,7 +198,7 @@ void RtBlockPagingServerImpl::unarchive_lowest_level()
 RtBlockPagingServerImpl::RtBlockPagingServerImpl( RtBlockPagingServerOptions const &opts ) :
   opts( opts )
 {
-	lvl0_arch = &opts.dataset->meta.sample_levels[ 0 ].archives[ 0 ];
+	auto &lvl0 = opts.dataset->meta.sample_levels[ 0 ];
 
 	basic_vaddr_buf = HostBuffer3D<int>( opts.dim );
 	vaddr_buf = HostBuffer3D<int>( opts.dim );
@@ -228,9 +219,9 @@ RtBlockPagingServerImpl::RtBlockPagingServerImpl( RtBlockPagingServerOptions con
 	}
 	memcpy( vaddr_buf.data(), basic_vaddr_buf.data(), vaddr_buf.bytes() );
 
-	auto bs = lvl0_arch->block_size;
-	auto pad = lvl0_arch->padding;
-	auto pad_bs = lvl0_arch->block_size + 2 * pad;
+	auto bs = opts.dataset->meta.block_size;
+	auto pad = opts.dataset->meta.padding;
+	auto pad_bs = opts.dataset->meta.block_size + 2 * pad;
 	auto k = float( bs ) / pad_bs;
 	auto b = vec3( float( pad ) / bs * k );
 	auto mapping = BlockSamplerMapping{}.set_k( k ).set_b( b );
@@ -249,7 +240,7 @@ RtBlockPagingServerImpl::RtBlockPagingServerImpl( RtBlockPagingServerOptions con
 	LOG( INFO ) << vm::fmt( "MAX_BLOCK_COUNT = {}", max_block_count );
 
 	unarchiver.reset( new Unarchiver( UnarchiverOptions{}
-                                    .set_path( opts.dataset->root.resolve( lvl0_arch->path ).resolved() )
+                                    .set_path( opts.dataset->root.resolve( lvl0.path ).resolved() )
                                     .set_device( opts.device ) ) );
 	pipeline.reset(
 	  new FnUnarchivePipeline(

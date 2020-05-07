@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 OPTIND=1
 
@@ -58,8 +58,18 @@ shift $((OPTIND-1))
 [ "${1:-}" = "--" ] && shift
 
 
+out=($(perl infer_dimension.pl ${raw_path}))
+if [ $? != 0 ]; then
+	echo "failed to infer dimension from raw filepath: '$raw_path"
+	exit 0
+fi
+dx=${out[0]}
+dy=${out[1]}
+dz=${out[2]}
+
 raw_base=$(basename ${raw_path})
 
+echo "raw=$dx,$dy,$dz"
 echo "padding=$pad; block_size=$(($log_bs))"
 echo "building ${dst_dir}..."
 
@@ -86,13 +96,15 @@ lvl_arch() {
 
 # set -x
 
+mb=$(($dx*$dy*$dz / 1024 / 1024))
+echo "sampling level 0/${lvls}... [$dx, $dy, $dz] = $mb MB"
 lvl_arch ${raw_path} $dx $dy $dz
 
-for i in $(seq ${lvls})
+for i in $(seq $((${lvls}-1)))
 do
-	xx=$(($dx >> ($i-1)))
-	yy=$(($dy >> ($i-1)))
-	zz=$(($dz >> ($i-1)))
+	xx=$(($dx >> ($i)))
+	yy=$(($dy >> ($i)))
+	zz=$(($dz >> ($i)))
 
 	mb=$(($xx*$yy*$zz / 1024 / 1024))
     echo "sampling level $i/${lvls}... [$xx, $yy, $zz] = $mb MB"
