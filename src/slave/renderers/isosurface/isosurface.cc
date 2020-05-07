@@ -166,6 +166,7 @@ DbufRtRenderCtx *IsosurfaceRenderer::create_dbuf_rt_render_ctx()
 		                                      .set_resolution( resolution ) );
 	ctx->recv = Image<IsosurfaceFetchPixel>( ImageOptions{}
                                              .set_resolution( resolution ) );
+	vm::println( "device = {}", device.value().id() );
 	auto opts = RtBlockPagingServerOptions{}
 				  .set_dim( dim )
 				  .set_dataset( dataset )

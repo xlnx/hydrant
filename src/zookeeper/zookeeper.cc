@@ -31,7 +31,6 @@ struct Session
 
 	~Session()
 	{
-		mpi_worker.join();
 	}
 
 private:
@@ -40,7 +39,7 @@ private:
 		// TODO: check termination
 		try {
 			std::vector<char> send_buf;
-			while ( true ) {
+			while ( !should_stop ) {
 				MpiInst cmd;
 				MPI_Status stat;
 				const int leader_rank = 1;
@@ -90,6 +89,12 @@ public:
 
 	void on_close()
 	{
+		should_stop = true;
+		mpi_worker.join();
+		// use empty packet as close signal
+		auto cmd = MpiInst{}.set_tag( tag ).set_len( 0 );
+		cmd.bcast_header( 0 );
+		cmd.bcast_payload( 0, nullptr );
 	}
 
 private:
@@ -113,6 +118,7 @@ private:
 	std::shared_ptr<Config> config;
 	std::vector<char> recv_buf;
 	std::thread mpi_worker;
+	bool should_stop = false;
 	int32_t tag;
 };
 

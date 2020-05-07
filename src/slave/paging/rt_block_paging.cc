@@ -162,7 +162,9 @@ void RtBlockPagingServerImpl::unarchive_lowest_level()
 		}
 	}
 
-	Unarchiver unarchiver( opts.dataset->root.resolve( arch.path ).resolved() );
+	Unarchiver unarchiver( UnarchiverOptions{}
+                                    .set_path( opts.dataset->root.resolve( arch.path ).resolved() )
+                                    .set_device( opts.device ) );
 	size_t nbytes = 0, block_bytes = buf->bytes();
 	lowest_blocks.reserve( arch.dim.total() );
 	unarchiver.unarchive(
@@ -246,7 +248,9 @@ RtBlockPagingServerImpl::RtBlockPagingServerImpl( RtBlockPagingServerOptions con
 	LOG( INFO ) << vm::fmt( "BLOCK_BYTES = {}", block_bytes );
 	LOG( INFO ) << vm::fmt( "MAX_BLOCK_COUNT = {}", max_block_count );
 
-	unarchiver.reset( new Unarchiver( opts.dataset->root.resolve( lvl0_arch->path ).resolved() ) );
+	unarchiver.reset( new Unarchiver( UnarchiverOptions{}
+                                    .set_path( opts.dataset->root.resolve( lvl0_arch->path ).resolved() )
+                                    .set_device( opts.device ) ) );
 	pipeline.reset(
 	  new FnUnarchivePipeline(
 		*unarchiver,
@@ -266,7 +270,7 @@ RtBlockPagingServerImpl::RtBlockPagingServerImpl( RtBlockPagingServerOptions con
 			} else if ( redundant_idxs.size() ) {
 				auto swap_idx = redundant_idxs.back();
 				redundant_idxs.pop_back();
-				LOG( INFO ) << vm::fmt( "swap +{} -{}", idx, swap_idx );
+				//				LOG( INFO ) << vm::fmt( "swap +{} -{}", idx, swap_idx );
 				present_idxs.erase( swap_idx );
 				auto uvec3_idx = uvec3( swap_idx.x, swap_idx.y, swap_idx.z );
 				auto &swap_vaddr = vaddr_buf[ uvec3_idx ];

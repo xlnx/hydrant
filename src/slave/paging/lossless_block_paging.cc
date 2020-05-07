@@ -50,7 +50,9 @@ struct LosslessBlockPagingServerImpl
 			.set_dim( dim )
 			.set_opts( cufx::Texture::Options::as_array()
 						 .set_address_mode( cufx::Texture::AddressMode::Clamp ) ) );
-		uu.reset( new Unarchiver( opts.dataset->root.resolve( lvl0_arch->path ).resolved() ) );
+		uu.reset( new Unarchiver( UnarchiverOptions{}
+                                    .set_path( opts.dataset->root.resolve( lvl0_arch->path ).resolved() )
+                                    .set_device( opts.device ) ) );
 
 		host_registry.resize( batch_size );
 		host_reg_view = cufx::MemoryView1D<BlockSampler>( host_registry.data(), batch_size );

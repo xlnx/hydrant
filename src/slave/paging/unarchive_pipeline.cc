@@ -68,7 +68,8 @@ VM_EXPORT
 
 	IUnarchivePipeline::IUnarchivePipeline( Unarchiver & unarchiver,
 											UnarchivePipelineOptions const &opts ) :
-	  unarchiver( unarchiver )
+	  unarchiver( unarchiver ),
+	  device( opts.device )
 	{
 		auto pad_bs = unarchiver.padded_block_size();
 		if ( opts.device.has_value() ) {
@@ -85,7 +86,7 @@ VM_EXPORT
 		curr_batch_size = 0;
 		required.resize( 0 );
 		should_stop = false;
-		worker.reset( new std::thread( [&] { this->run(); } ) );
+		worker.reset( new cufx::WorkerThread( [&] { this->run(); }, device ) );
 	}
 
 	void IUnarchivePipeline::stop()

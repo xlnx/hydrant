@@ -13,13 +13,19 @@ VM_BEGIN_MODULE( hydrant )
 
 struct Session : IRenderLoop
 {
-	Session( MpiComm const &comm, int32_t tag, Config const &cfg ) :
+	Session( MpiComm const &comm, int32_t tag, Config &cfg ) :
 		IRenderLoop( cfg.params.camera ),
 		comm( comm ),
 		path( cfg.data_path ),
-		renderer( RendererFactory( path ).create( cfg.params.render ) ),
+		renderer( [&] {
+				auto params = cfg.params.render.params.get<BasicRendererParams>();
+				params.comm_rank = comm.rank;
+				cfg.params.render.params.update( params );
+				return RendererFactory( path ).create( cfg.params.render );
+			} () ),
 		tag( tag )
 	{
+		vm::println( "session #{} started", tag );
 		worker = std::thread( [this] {
 				this->renderer->realtime_render( *this,
 												 RealtimeRenderOptions{}
@@ -32,6 +38,7 @@ struct Session : IRenderLoop
 	{
 		stop = true;
 		worker.join();
+		vm::println( "session #{} exited", tag );
 	}
 	
 public:
@@ -97,8 +104,11 @@ public:
 				is >> cfg;
 				sessions.emplace( cmd.tag,
 								  vm::Box<Session>( new Session( comm, cmd.tag, cfg ) ) );
-			} else {
+			} else if ( cmd.len ) {
 				it->second->update( payload );
+			} else {
+				// empty packet for close session
+				sessions.erase( it );
 			}
 		}
 		
