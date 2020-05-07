@@ -34,8 +34,6 @@ protected:
 
 private:
 	TransferFn transfer_fn;
-	vol::MtArchive *lvl0_arch;
-
 	ThumbnailTexture<int> chebyshev;
 };
 
@@ -50,11 +48,9 @@ bool VolumeRenderer::init( std::shared_ptr<Dataset> const &dataset,
 	transfer_fn = TransferFn( params.transfer_fn, device );
 	shader.transfer_fn = transfer_fn.sampler();
 
-	lvl0_arch = &dataset->meta.sample_levels[ 0 ].archives[ 0 ];
-
 	chebyshev_thumb.reset(
 	  new vol::Thumbnail<int>(
-		dataset->root.resolve( lvl0_arch->thumbnails[ "chebyshev" ] ).resolved() ) );
+		dataset->root.resolve( dataset->meta.sample_levels[ 0 ].thumbnails[ "chebyshev" ] ).resolved() ) );
 	chebyshev = create_texture( chebyshev_thumb );
 	shader.chebyshev = chebyshev.sampler();
 

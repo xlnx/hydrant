@@ -32,15 +32,15 @@ bool BlocksRenderer::init( std::shared_ptr<Dataset> const &dataset,
 {
 	if ( !Super::init( dataset, cfg ) ) { return false; }
 
-	auto &lvl0_arch = dataset->meta.sample_levels[ 0 ].archives[ 0 ];
+	auto &lvl0 = dataset->meta.sample_levels[ 0 ];
 
 	auto chebyshev_thumb = std::make_shared<vol::Thumbnail<int>>(
-	  dataset->root.resolve( lvl0_arch.thumbnails[ "chebyshev" ] ).resolved() );
+	  dataset->root.resolve( lvl0.thumbnails[ "chebyshev" ] ).resolved() );
 	chebyshev = create_texture( chebyshev_thumb );
 	shader.chebyshev = chebyshev.sampler();
 
 	auto mean_thumb = std::make_shared<vol::Thumbnail<float>>(
-	  dataset->root.resolve( lvl0_arch.thumbnails[ "mean" ] ).resolved() );
+	  dataset->root.resolve( lvl0.thumbnails[ "mean" ] ).resolved() );
 	mean = create_texture( mean_thumb );
 	shader.mean_tex = mean.sampler();
 

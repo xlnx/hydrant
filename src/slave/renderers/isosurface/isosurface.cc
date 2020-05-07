@@ -33,8 +33,6 @@ protected:
 							   MpiComm const &comm ) override;
 
 private:
-	vol::MtArchive *lvl0_arch;
-
 	ThumbnailTexture<int> chebyshev;
 };
 
@@ -47,11 +45,9 @@ bool IsosurfaceRenderer::init( std::shared_ptr<Dataset> const &dataset,
 	vm::println( "MAX_STEPS = {}", shader.max_steps );
 	vm::println( "MARCH_DIST = {}", shader.max_steps * shader.step );
 
-	lvl0_arch = &dataset->meta.sample_levels[ 0 ].archives[ 0 ];
-
 	chebyshev_thumb.reset(
 	  new vol::Thumbnail<int>(
-		dataset->root.resolve( lvl0_arch->thumbnails[ "chebyshev" ] ).resolved() ) );
+		dataset->root.resolve( dataset->meta.sample_levels[ 0 ].thumbnails[ "chebyshev" ] ).resolved() ) );
 	chebyshev = create_texture( chebyshev_thumb );
 	shader.chebyshev = chebyshev.sampler();
 

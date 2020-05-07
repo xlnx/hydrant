@@ -47,12 +47,6 @@ include_directories(
   ${PROJECT_SOURCE_DIR}/ui
 )
 
-function(install_mod module)
-  install(TARGETS ${module}
-    LIBRARY DESTINATION mods
-  )
-endfunction()
-
 add_subdirectory(src)
 
 install(FILES README.md 
@@ -64,6 +58,6 @@ install(DIRECTORY configs
   DESTINATION .
   COMPONENT runtime
 )
-install(FILES build_dataset.sh
+install(FILES build_dataset.sh infer_dimension.pl
   DESTINATION .
 )

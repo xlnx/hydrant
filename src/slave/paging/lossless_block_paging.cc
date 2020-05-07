@@ -14,14 +14,14 @@ struct LosslessBlockPagingServerImpl
 {
 	LosslessBlockPagingServerImpl( LosslessBlockPagingServerOptions const &opts )
 	{
-		auto lvl0_arch = &opts.dataset->meta.sample_levels[ 0 ].archives[ 0 ];
-		auto bs = lvl0_arch->block_size;
-		auto pad = lvl0_arch->padding;
+		auto &lvl0 = opts.dataset->meta.sample_levels[ 0 ];
+		auto bs = opts.dataset->meta.block_size;
+		auto pad = opts.dataset->meta.padding;
 		auto pad_bs = bs + pad * 2;
 		auto k = float( bs ) / pad_bs;
 		auto b = vec3( float( pad ) / bs * k );
 		auto mem_limit_bytes = opts.mem_limit_mb * 1024 * 1024;
-		auto dim = uvec3( lvl0_arch->dim.x, lvl0_arch->dim.y, lvl0_arch->dim.z );
+		auto dim = uvec3( lvl0.dim.x, lvl0.dim.y, lvl0.dim.z );
 		auto storage_opts = Texture3DOptions{}
 							  .set_dim( pad_bs )
 							  .set_device( opts.device )
@@ -51,7 +51,7 @@ struct LosslessBlockPagingServerImpl
 			.set_opts( cufx::Texture::Options::as_array()
 						 .set_address_mode( cufx::Texture::AddressMode::Clamp ) ) );
 		uu.reset( new Unarchiver( UnarchiverOptions{}
-                                    .set_path( opts.dataset->root.resolve( lvl0_arch->path ).resolved() )
+                                    .set_path( opts.dataset->root.resolve( lvl0.path ).resolved() )
                                     .set_device( opts.device ) ) );
 
 		host_registry.resize( batch_size );
