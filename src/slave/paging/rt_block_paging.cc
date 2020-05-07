@@ -269,7 +269,8 @@ RtBlockPagingServerImpl::RtBlockPagingServerImpl( RtBlockPagingServerOptions con
 				/* reset that block to lowest sample level */
 				swap_vaddr = basic_vaddr_buf[ uvec3_idx ];
 			} else {
-				LOG( FATAL ) << vm::fmt( "internal error: invalid state when transferring block {}", idx );
+				LOG( WARNING ) << vm::fmt( "artifact {}", idx );
+				return;
 			}
 
 			auto storage_id = vaddr_id - lowest_blocks.size();
