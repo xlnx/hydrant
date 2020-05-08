@@ -135,7 +135,7 @@ void PagingRenderer::dbuf_rt_render_frame( Image<cufx::StdByte3Pixel> &frame,
 			ns0 /= m;
 			ns1 /= m;
 			ns2 /= m;
-			vm::println("render/fetch/merge = {}/{}/{}", ns0, ns1, ns2 );
+			//			vm::println("render/fetch/merge = {}/{}/{}", ns0, ns1, ns2 );
 		});
 	
 	int shl = 0;
