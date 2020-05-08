@@ -8,7 +8,20 @@
 #include <hydrant/paging/block_paging.hpp>
 #include <volume.schema.hpp>
 
-struct VolumeShader : IShader<StdVec4Pixel>
+struct VolumePixel : StdVec4Pixel
+{
+	vec3 theta;
+	float phi;
+};
+
+struct VolumeFetchPixel
+{
+	vec3 theta;
+	float phi;
+	vec4 val;
+};
+
+struct VolumeShader : IShader<VolumePixel>
 {
 	float density;
 	Sampler transfer_fn;

@@ -162,7 +162,6 @@ DbufRtRenderCtx *IsosurfaceRenderer::create_dbuf_rt_render_ctx()
 		                                      .set_resolution( resolution ) );
 	ctx->recv = Image<IsosurfaceFetchPixel>( ImageOptions{}
                                              .set_resolution( resolution ) );
-	vm::println( "device = {}", device.value().id() );
 	auto opts = RtBlockPagingServerOptions{}
 				  .set_dim( dim )
 				  .set_dataset( dataset )
@@ -222,9 +221,11 @@ void IsosurfaceRenderer::dbuf_rt_render_frame( Image<cufx::StdByte3Pixel> &frame
 
 	vm::Timer::Scoped( [&]( auto dt ) {
 			ns2 = dt.ns().cnt();
-			ns0 /= ns2;
-			ns1 /= ns2;
-			//			vm::println("render/fetch/merge = {}/{}/{}", ns0, ns1, 1 );
+			auto m = std::min( ns0, std::min( ns1, ns2 ) );
+			ns0 /= m;
+			ns1 /= m;
+			ns2 /= m;
+			vm::println("render/fetch/merge = {}/{}/{}", ns0, ns1, ns2 );
 		});
 	
 	int shl = 0;
