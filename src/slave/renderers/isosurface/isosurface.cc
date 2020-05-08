@@ -33,6 +33,7 @@ protected:
 							   MpiComm const &comm ) override;
 
 private:
+	std::size_t mem_limit_mb;
 	ThumbnailTexture<int> chebyshev;
 };
 
@@ -61,6 +62,7 @@ void IsosurfaceRenderer::update( vm::json::Any const &params_in )
 	Super::update( params_in );
 
 	auto params = params_in.get<IsosurfaceRendererParams>();
+	mem_limit_mb = params.mem_limit_mb;
 	shader.mode = params.mode;
 	shader.surface_color = params.surface_color;
 	shader.isovalue = params.isovalue;
@@ -166,6 +168,7 @@ DbufRtRenderCtx *IsosurfaceRenderer::create_dbuf_rt_render_ctx()
 				  .set_dim( dim )
 				  .set_dataset( dataset )
 				  .set_device( device )
+				  .set_mem_limit_mb( mem_limit_mb )
 				  .set_storage_opts( cufx::Texture::Options{}
 									   .set_address_mode( cufx::Texture::AddressMode::Wrap )
 									   .set_filter_mode( cufx::Texture::FilterMode::Linear )
@@ -225,7 +228,9 @@ void IsosurfaceRenderer::dbuf_rt_render_frame( Image<cufx::StdByte3Pixel> &frame
 			ns0 /= m;
 			ns1 /= m;
 			ns2 /= m;
-			vm::println("render/fetch/merge = {}/{}/{}", ns0, ns1, ns2 );
+			if ( comm.rank == 0 ) {
+				vm::println("render/fetch/merge = {}/{}/{}", ns0, ns1, ns2 );
+			}
 		});
 	
 	int shl = 0;

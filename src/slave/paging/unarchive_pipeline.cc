@@ -10,35 +10,15 @@ VM_EXPORT
 	vector<Idx> IUnarchivePipeline::Lock::top_k_idxs( size_t k )
 	{
 		pipeline.curr_batch_size = std::min( k, pipeline.required.size() );
-		auto seq_beg = pipeline.required.begin();
-		auto seq_end = seq_beg + pipeline.curr_batch_size;
-		std::nth_element(
-		  seq_beg, seq_end, pipeline.required.end(),
-		  []( auto &a, auto &b ) {
-			  return a.second < b.second;
-		  } );
-		std::vector<vol::Idx> res( pipeline.curr_batch_size );
-		std::transform(
-		  seq_beg, seq_end, res.begin(),
-		  []( auto &a ) {
-			  return a.first;
-		  } );
-		sort_required_idxs();
+		std::vector<vol::Idx> res( pipeline.required.begin(),
+								   pipeline.required.begin() + pipeline.curr_batch_size );
+		std::sort( res.begin(), res.end() );
 		return res;
 	}
 
-	void IUnarchivePipeline::Lock::sort_required_idxs()
+	void IUnarchivePipeline::Lock::require( vector<vol::Idx> const &missing ) &&
 	{
-		std::sort(
-		  pipeline.required.begin(), pipeline.required.end(),
-		  []( auto &a, auto &b ) {
-			  return a.first < b.first;
-		  } );
-	}
-
-	void IUnarchivePipeline::Lock::require_impl( bool is_ordered )
-	{
-		if ( !is_ordered ) { sort_required_idxs(); }
+		pipeline.required = missing;
 		lk.unlock();
 		pipeline.cv.notify_one();
 	}
@@ -92,11 +72,7 @@ VM_EXPORT
 				  if ( nbytes >= buf->bytes() ) {
 					  {
 						  auto lk = this->lock();
-						  auto it = find_if(
-							required.begin(), required.end(),
-							[&]( auto &a ) {
-								return a.first == idx;
-							} );
+						  auto it = find( required.begin(), required.end(), idx );
 						  if ( it != required.end() ) {
 							  required.erase( it );
 						  }

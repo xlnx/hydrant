@@ -33,6 +33,7 @@ protected:
 							   MpiComm const &comm ) override;
 
 private:
+	std::size_t mem_limit_mb;
 	TransferFn transfer_fn;
 	ThumbnailTexture<int> chebyshev;
 };
@@ -43,6 +44,7 @@ bool VolumeRenderer::init( std::shared_ptr<Dataset> const &dataset,
 	if ( !Super::init( dataset, cfg ) ) { return false; }
 
 	auto params = cfg.params.get<VolumeRendererParams>();
+	mem_limit_mb = params.mem_limit_mb;
 	// shader.render_mode = params.mode == "volume" ? BrmVolume : BrmSolid;
 	shader.density = params.density;
 	transfer_fn = TransferFn( params.transfer_fn, device );
@@ -159,6 +161,7 @@ DbufRtRenderCtx *VolumeRenderer::create_dbuf_rt_render_ctx()
 				  .set_dim( dim )
 				  .set_dataset( dataset )
 				  .set_device( device )
+				  .set_mem_limit_mb( mem_limit_mb )
 				  .set_storage_opts( cufx::Texture::Options{}
 									   .set_address_mode( cufx::Texture::AddressMode::Wrap )
 									   .set_filter_mode( cufx::Texture::FilterMode::Linear )
@@ -213,7 +216,9 @@ void VolumeRenderer::dbuf_rt_render_frame( Image<cufx::StdByte3Pixel> &frame,
 			ns0 /= m;
 			ns1 /= m;
 			ns2 /= m;
-			vm::println("render/fetch/merge = {}/{}/{}", ns0, ns1, ns2 );
+			if ( comm.rank == 0 ) {
+				//				vm::println("render/fetch/merge = {}/{}/{}", ns0, ns1, ns2 );
+			}
 		} );
 
 	for ( int i = 1; i < comm.size; ++i ) {
