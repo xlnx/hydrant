@@ -219,7 +219,7 @@ void IsosurfaceRenderer::dbuf_rt_render_frame( Image<cufx::StdByte3Pixel> &frame
 		ctx.local.fetch_data();
 	}
 
-	vm::Timer::Scoped( [&]( auto dt ) {
+	vm::Timer::Scoped timer( [&]( auto dt ) {
 			ns2 = dt.ns().cnt();
 			auto m = std::min( ns0, std::min( ns1, ns2 ) );
 			ns0 /= m;

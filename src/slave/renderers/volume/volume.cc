@@ -207,13 +207,13 @@ void VolumeRenderer::dbuf_rt_render_frame( Image<cufx::StdByte3Pixel> &frame,
 		ctx.local.fetch_data();
 	}
 
-	vm::Timer::Scoped( [&]( auto dt ) {
+	vm::Timer::Scoped timer( [&]( auto dt ) {
 			ns2 = dt.ns().cnt();
 			auto m = std::min( ns0, std::min( ns1, ns2 ) );
 			ns0 /= m;
 			ns1 /= m;
 			ns2 /= m;
-			//			vm::println("render/fetch/merge = {}/{}/{}", ns0, ns1, ns2 );
+			vm::println("render/fetch/merge = {}/{}/{}", ns0, ns1, ns2 );
 		} );
 
 	for ( int i = 1; i < comm.size; ++i ) {
