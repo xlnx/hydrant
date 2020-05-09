@@ -43,18 +43,13 @@ bool VolumeRenderer::init( std::shared_ptr<Dataset> const &dataset,
 {
 	if ( !Super::init( dataset, cfg ) ) { return false; }
 
-	auto params = cfg.params.get<VolumeRendererParams>();
-	mem_limit_mb = params.mem_limit_mb;
-	// shader.render_mode = params.mode == "volume" ? BrmVolume : BrmSolid;
-	shader.density = params.density;
-	transfer_fn = TransferFn( params.transfer_fn, device );
-	shader.transfer_fn = transfer_fn.sampler();
-
 	chebyshev_thumb.reset(
 	  new vol::Thumbnail<int>(
 		dataset->root.resolve( dataset->meta.sample_levels[ 0 ].thumbnails[ "chebyshev" ] ).resolved() ) );
 	chebyshev = create_texture( chebyshev_thumb );
 	shader.chebyshev = chebyshev.sampler();
+
+	update( cfg.params );
 
 	return true;
 }
@@ -64,9 +59,12 @@ void VolumeRenderer::update( vm::json::Any const &params_in )
 	Super::update( params_in );
 
 	auto params = params_in.get<VolumeRendererParams>();
-	// shader.mode = params.mode;
-	// shader.surface_color = params.surface_color;
+	mem_limit_mb = params.mem_limit_mb;
 	shader.density = params.density;
+	if ( params.transfer_fn.values.size() ) {
+		transfer_fn = TransferFn( params.transfer_fn, device );
+		shader.transfer_fn = transfer_fn.sampler();
+	}
 }
 
 struct VolumeOfflineRenderCtx : OfflineRenderCtx
@@ -217,7 +215,7 @@ void VolumeRenderer::dbuf_rt_render_frame( Image<cufx::StdByte3Pixel> &frame,
 			ns1 /= m;
 			ns2 /= m;
 			if ( comm.rank == 0 ) {
-				//				vm::println("render/fetch/merge = {}/{}/{}", ns0, ns1, ns2 );
+				vm::println("render/fetch/merge = {}/{}/{}", ns0, ns1, ns2 );
 			}
 		} );
 
