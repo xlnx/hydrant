@@ -60,6 +60,7 @@ void VolumeRenderer::update( vm::json::Any const &params_in )
 
 	auto params = params_in.get<VolumeRendererParams>();
 	mem_limit_mb = params.mem_limit_mb;
+	shader.mode = params.mode;
 	shader.density = params.density;
 	if ( params.transfer_fn.values.size() ) {
 		transfer_fn = TransferFn( params.transfer_fn, device );
@@ -179,7 +180,8 @@ void VolumeRenderer::dbuf_rt_render_frame( Image<cufx::StdByte3Pixel> &frame,
 	auto &ctx = static_cast<VolumeRtRenderCtx &>( ctx_in );
 
 	std::size_t ns0, ns1, ns2;
-	
+
+	shader.rank = float( comm.rank ) / ( comm.size - 1 );
 	shader.paging = ctx.srv->update( culler, loop.camera );
 	
 	auto opts = RaycastingOptions{}.set_device( device );

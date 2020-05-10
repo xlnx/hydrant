@@ -46,19 +46,22 @@ struct VolumeShaderKernel : VolumeShader
 				nsteps -= skip_nblock_steps( ray, ip, cd, cdu, step );
 			} else {
 				auto pgid = paging.vaddr.sample_3d<int>( ip );
-				if ( pgid != -1 ) {
-					auto s_i = paging.block_sampler[ pgid ].sample_3d<float>( ray.o - ip );
-					auto ub_i = transfer_fn.sample_1d<vec4>( s_i ) * density;
-					pixel.theta += vec3( ub_i ) * pixel.phi;
-					pixel.phi *= 1.f - ub_i.w;
-					pixel.v += ub_i * ( 1.f - pixel.v.w );
-					if ( pixel.v.w > opacity_threshold ) {
-						break;
-					}
-				} else {
-					// ivec3 ipm = mod( ip, vec3( MAXX ) );
-					// absent_coord[ ipm.x ][ ipm.y ][ ipm.z ] = ip;
-					// is_absent[ ipm.x ][ ipm.y ][ ipm.z ] = true;
+				if ( pgid == -1 ) break;
+				
+				auto s_i = paging.block_sampler[ pgid ].sample_3d<float>( ray.o - ip );
+				auto ub_i = transfer_fn.sample_1d<vec4>( s_i );
+				if ( mode == VolumeRenderMode::Partition ) {
+				    vec3 lower = { 1, 0, 0 };
+				    vec3 upper = { 0, 0, 1 };
+					auto v = mix( lower, upper, rank ) *
+						       length( vec3( ub_i ) );
+					ub_i = vec4( v.x, v.y, v.z, ub_i.w );
+				}
+				ub_i *= density;
+				pixel.theta += vec3( ub_i ) * pixel.phi;
+				pixel.phi *= 1.f - ub_i.w;
+				pixel.v += ub_i * ( 1.f - pixel.v.w );
+				if ( pixel.v.w > opacity_threshold ) {
 					break;
 				}
 			}

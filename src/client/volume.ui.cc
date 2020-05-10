@@ -19,6 +19,14 @@ struct VolumeUi : IUiTyped<VolumeRendererParams>
 		} else {
 			params.transfer_fn.values.resize( 0 );
 		}
+		if ( ImGui::BeginCombo( "Mode", params.mode._to_string() ) ) {
+			for ( auto mode : VolumeRenderMode::_values() ) {
+				if ( ImGui::Selectable( mode._to_string(), mode == params.mode ) ) {
+					params.mode = mode;
+				}
+			}
+			ImGui::EndCombo();
+		}
 		ImGui::InputFloat( "Density", &params.density );
 		tfn_widget.draw_ui();
 	}
