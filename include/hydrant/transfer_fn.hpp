@@ -15,14 +15,15 @@ VM_EXPORT
 					vm::Option<cufx::Device> const &device ) :
 		  Texture1D( Texture1DOptions{}
 					   .set_device( device )
-					   .set_length( cfg.values.size() )
+					   .set_length( cfg.values.size() / 4 )
 					   .set_opts( cufx::Texture::Options{}
 									.set_address_mode( cufx::Texture::AddressMode::Border )
 									.set_filter_mode( cufx::Texture::FilterMode::Linear )
 									.set_read_mode( cufx::Texture::ReadMode::Raw )
 									.set_normalize_coords( true ) ) )
 		{
-			data = cfg.values;
+			data.resize( cfg.values.size() / 4 );
+			memcpy( data.data(), cfg.values.data(), cfg.values.size() * sizeof( float ) );
 			source( data.data(), false );
 		}
 

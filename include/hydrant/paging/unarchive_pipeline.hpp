@@ -41,24 +41,9 @@ VM_EXPORT
 			}
 
 		public:
-			template <typename InputIterator, typename PriorityOp>
-			void require( InputIterator const &seq_beg, InputIterator const &seq_end,
-						  PriorityOp const &priority_op, bool is_ordered = false ) &&
-			{
-				pipeline.required.resize( seq_end - seq_beg );
-				std::transform(
-				  seq_beg, seq_end, pipeline.required.begin(),
-				  [&]( vol::Idx const &idx ) {
-					  return std::make_pair( idx, priority_op( idx ) );
-				  } );
-				require_impl( is_ordered );
-			}
-
+			void require( std::vector<vol::Idx> const &missing ) &&;
+				
 		private:
-			void sort_required_idxs();
-
-			void require_impl( bool is_ordered );
-
 			std::vector<vol::Idx> top_k_idxs( std::size_t k );
 
 		private:
@@ -85,10 +70,8 @@ VM_EXPORT
 		bool should_stop = false;
 		std::mutex mut;
 		std::condition_variable cv;
-		std::vector<std::pair<vol::Idx, float>> required;
+		std::vector<vol::Idx> required;
 		vm::Option<cufx::Device> device;
-		using StillNeed = std::pair<std::atomic_bool, vol::Idx>;
-		std::unique_ptr<StillNeed[]> still_need;
 		std::size_t curr_batch_size = 0;
 		std::unique_ptr<IBuffer3D<unsigned char>> buf;
 		std::unique_ptr<cufx::WorkerThread> worker;

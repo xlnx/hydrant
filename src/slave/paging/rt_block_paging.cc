@@ -7,7 +7,7 @@
 #include <hydrant/paging/unarchive_pipeline.hpp>
 #include <hydrant/paging/rt_block_paging.hpp>
 
-#define MAX_SAMPLER_COUNT ( 4096 )
+#define MAX_SAMPLER_COUNT ( 32768 )
 
 VM_BEGIN_MODULE( hydrant )
 
@@ -269,7 +269,8 @@ RtBlockPagingServerImpl::RtBlockPagingServerImpl( RtBlockPagingServerOptions con
 				/* reset that block to lowest sample level */
 				swap_vaddr = basic_vaddr_buf[ uvec3_idx ];
 			} else {
-				LOG( FATAL ) << vm::fmt( "internal error: invalid state when transferring block {}", idx );
+				LOG( WARNING ) << vm::fmt( "artifact {}", idx );
+				return;
 			}
 
 			auto storage_id = vaddr_id - lowest_blocks.size();
@@ -293,7 +294,8 @@ RtBlockPagingServerImpl::RtBlockPagingServerImpl( RtBlockPagingServerOptions con
 
 void RtBlockPagingServerImpl::update( OctreeCuller &culler, Camera const &camera )
 {
-	auto &require_idxs = culler.cull( camera, max_block_count );
+	std::function<float( const vol::Idx & )> dist_fn;
+	auto &require_idxs = culler.cull( camera, &dist_fn, max_block_count );
 	{
 		std::unique_lock<std::mutex> lk( idxs_mut );
 
@@ -310,9 +312,9 @@ void RtBlockPagingServerImpl::update( OctreeCuller &culler, Camera const &camera
 		redundant_idxs.resize( redundant_idxs_end - redundant_idxs.begin() );
 
 		if ( missing_idxs.size() ) {
-			pipeline->lock().require( missing_idxs.begin(),
-									  missing_idxs.end(),
-									  []( auto &idx ) { return 1.f; } );
+			std::sort( missing_idxs.begin(), missing_idxs.end(),
+					   [&]( auto &a,  auto &b ){ return dist_fn( a ) < dist_fn( b ); } );
+			pipeline->lock().require( missing_idxs );
 		}
 	}
 

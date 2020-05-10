@@ -8,6 +8,11 @@
 #include <hydrant/paging/block_paging.hpp>
 #include "paging.schema.hpp"
 
+struct PagingFetchPixel
+{
+	uchar3 val;
+};
+
 struct PagingShader : IShader<StdVec4Pixel>
 {
 	// PagingRenderMode mode;

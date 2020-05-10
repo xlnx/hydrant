@@ -109,6 +109,7 @@ VM_EXPORT
 		}
 
 		const std::vector<vol::Idx> &cull( Camera const &camera,
+										   std::function<float( vol::Idx const & )> *dist_fn = nullptr,
 										   std::size_t limit = std::numeric_limits<std::size_t>::max(),
 										   ScreenRect const &rect = ScreenRect{} )
 		{
@@ -132,12 +133,16 @@ VM_EXPORT
 					}
 				}
 			}
+			auto df = [orig=frust.orig]( vol::Idx const &idx ) {
+				return distance2( orig,
+								  vec3( idx.x, idx.y, idx.z ) + .5f );
+			};
+			if ( dist_fn ) { *dist_fn = df; }
 			auto length = std::min( limit, buf.size() );
 			std::nth_element(
 			  buf.begin(), buf.begin() + length, buf.end(),
 			  [&]( auto &a, auto &b ) {
-				  return distance2( frust.orig, vec3( a.x, a.y, a.z ) + .5f ) <
-						 distance2( frust.orig, vec3( b.x, b.y, b.z ) + .5f );
+				  return df( a ) < df( b );
 			  } );
 			// vm::println( "{}", frust.norm[ 0 ].o );
 			buf.resize( length );

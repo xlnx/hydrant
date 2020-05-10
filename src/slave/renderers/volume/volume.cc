@@ -33,6 +33,7 @@ protected:
 							   MpiComm const &comm ) override;
 
 private:
+	std::size_t mem_limit_mb;
 	TransferFn transfer_fn;
 	ThumbnailTexture<int> chebyshev;
 };
@@ -42,17 +43,13 @@ bool VolumeRenderer::init( std::shared_ptr<Dataset> const &dataset,
 {
 	if ( !Super::init( dataset, cfg ) ) { return false; }
 
-	auto params = cfg.params.get<VolumeRendererParams>();
-	// shader.render_mode = params.mode == "volume" ? BrmVolume : BrmSolid;
-	shader.density = params.density;
-	transfer_fn = TransferFn( params.transfer_fn, device );
-	shader.transfer_fn = transfer_fn.sampler();
-
 	chebyshev_thumb.reset(
 	  new vol::Thumbnail<int>(
 		dataset->root.resolve( dataset->meta.sample_levels[ 0 ].thumbnails[ "chebyshev" ] ).resolved() ) );
 	chebyshev = create_texture( chebyshev_thumb );
 	shader.chebyshev = chebyshev.sampler();
+
+	update( cfg.params );
 
 	return true;
 }
@@ -62,9 +59,13 @@ void VolumeRenderer::update( vm::json::Any const &params_in )
 	Super::update( params_in );
 
 	auto params = params_in.get<VolumeRendererParams>();
-	// shader.mode = params.mode;
-	// shader.surface_color = params.surface_color;
+	mem_limit_mb = params.mem_limit_mb;
+	shader.mode = params.mode;
 	shader.density = params.density;
+	if ( params.transfer_fn.values.size() ) {
+		transfer_fn = TransferFn( params.transfer_fn, device );
+		shader.transfer_fn = transfer_fn.sampler();
+	}
 }
 
 struct VolumeOfflineRenderCtx : OfflineRenderCtx
@@ -135,6 +136,8 @@ cufx::Image<> VolumeRenderer::offline_render_ctxed( OfflineRenderCtx &ctx_in, Ca
 struct VolumeRtRenderCtx : DbufRtRenderCtx
 {
 	Image<VolumeShader::Pixel> film;
+	Image<VolumeFetchPixel> local;
+	Image<VolumeFetchPixel> recv;
 	std::unique_ptr<RtBlockPagingServer> srv;
 
 public:
@@ -148,10 +151,16 @@ DbufRtRenderCtx *VolumeRenderer::create_dbuf_rt_render_ctx()
 {
 	auto ctx = new VolumeRtRenderCtx;
 	ctx->film = create_film();
+	ctx->local = Image<VolumeFetchPixel>( ImageOptions{}
+                                          .set_device( device )
+		                                  .set_resolution( resolution ) );
+	ctx->recv = Image<VolumeFetchPixel>( ImageOptions{}
+		                                  .set_resolution( resolution ) );
 	auto opts = RtBlockPagingServerOptions{}
 				  .set_dim( dim )
 				  .set_dataset( dataset )
 				  .set_device( device )
+				  .set_mem_limit_mb( mem_limit_mb )
 				  .set_storage_opts( cufx::Texture::Options{}
 									   .set_address_mode( cufx::Texture::AddressMode::Wrap )
 									   .set_filter_mode( cufx::Texture::FilterMode::Linear )
@@ -170,16 +179,16 @@ void VolumeRenderer::dbuf_rt_render_frame( Image<cufx::StdByte3Pixel> &frame,
 {
 	auto &ctx = static_cast<VolumeRtRenderCtx &>( ctx_in );
 
-	std::size_t ns = 0, ns1 = 0;
-	
+	std::size_t ns0, ns1, ns2;
+
+	shader.rank = float( comm.rank ) / ( comm.size - 1 );
 	shader.paging = ctx.srv->update( culler, loop.camera );
 	
+	auto opts = RaycastingOptions{}.set_device( device );
 	{
 		vm::Timer::Scoped timer( [&]( auto dt ) {
-				ns1 += dt.ns().cnt();
+				ns0 = dt.ns().cnt();
 			} );
-		
-		auto opts = RaycastingOptions{}.set_device( device );
 		
 		raycaster.ray_emit_pass( exhibit,
 								 loop.camera,
@@ -187,11 +196,66 @@ void VolumeRenderer::dbuf_rt_render_frame( Image<cufx::StdByte3Pixel> &frame,
 								 shader,
 								 opts );
 		
-		raycaster.pixel_pass( ctx.film.view(),
-							  frame.view(),
+		raycaster.fetch_pass( ctx.film.view(),
+							  ctx.local.view(),
 							  shader,
 							  opts );
+		ctx.local.update_device_view();
 	}
+
+	{
+		vm::Timer::Scoped timer( [&]( auto dt ) {
+				ns1 = dt.ns().cnt();
+			} );
+		ctx.local.fetch_data();
+	}
+
+	vm::Timer::Scoped timer( [&]( auto dt ) {
+			ns2 = dt.ns().cnt();
+			auto m = std::min( ns0, std::min( ns1, ns2 ) );
+			ns0 /= m;
+			ns1 /= m;
+			ns2 /= m;
+			if ( comm.rank == 0 ) {
+				vm::println("render/fetch/merge = {}/{}/{}", ns0, ns1, ns2 );
+			}
+		} );
+
+	for ( int i = 1; i < comm.size; ++i ) {
+		if ( comm.rank == i ) {
+			MPI_Send( &ctx.local.view().at_host( 0, 0 ), ctx.local.bytes(),
+					  MPI_CHAR, 0, 0, comm.comm );
+		} else if ( comm.rank == 0 ) {
+			MPI_Recv( &ctx.recv.view().at_host( 0, 0 ), ctx.recv.bytes(),
+					  MPI_CHAR, i, 0, comm.comm, MPI_STATUS_IGNORE );
+			auto local_view = ctx.local.view();
+			auto recv_view = ctx.recv.view();
+			for ( int j = 0; j != local_view.height(); ++j ) {
+				for ( int i = 0; i != local_view.width(); ++i ) {
+					auto &local = local_view.at_host( i, j );
+					auto &recv = recv_view.at_host( i, j );
+					auto v_n = vec3( local.val ) + vec3( recv.val ) -
+						local.val.w * recv.theta;
+					auto a_n = recv.phi * local.val.w + recv.val.w;
+					local.val = vec4( v_n.x, v_n.y, v_n.z, a_n );
+				}
+			}
+		}
+	}
+
+	if ( comm.rank == 0 ) {
+		auto local_view = ctx.local.view();
+		auto frame_view = frame.view();
+		for ( int j = 0; j != local_view.height(); ++j ) {
+			for ( int i = 0; i != local_view.width(); ++i ) {
+				auto val = saturate( local_view.at_host( i, j ).val );
+				reinterpret_cast<uchar3&>( frame_view.at_host( i, j ) ) =
+					uchar3{ val.x, val.y, val.z };
+			}
+		}
+	}
+
+	MPI_Barrier( comm.comm );
 }
 
 REGISTER_RENDERER( VolumeRenderer, "Volume" );

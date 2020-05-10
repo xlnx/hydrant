@@ -14,6 +14,22 @@ struct VolumeShaderKernel : VolumeShader
 	}
 
 	__host__ __device__ void
+	  init( Pixel &pixel_out, Ray const &ray ) const
+	{
+		pixel_out.theta = vec3( 0 );
+		pixel_out.phi = 1.f;
+	}
+
+	__host__ __device__ void
+	  fetch( Pixel const &pixel_in, void *pixel_out_ ) const
+	{
+		auto pixel_out = reinterpret_cast<VolumeFetchPixel *>( pixel_out_ );
+		pixel_out->val = pixel_in.v;
+		pixel_out->theta = pixel_in.theta;
+		pixel_out->phi = pixel_in.phi;
+	}
+
+	__host__ __device__ void
 	  main( Pixel &pixel_in_out ) const
 	{
 		const auto cdu = 1.f / compMax( abs( pixel_in_out.ray.d ) );
@@ -26,21 +42,26 @@ struct VolumeShaderKernel : VolumeShader
 		while ( nsteps > 0 ) {
 			vec3 ip = floor( ray.o );
 			if ( int cd = chebyshev.sample_3d<int>( ip ) ) {
+			    // skip_block.b_i = 0
 				nsteps -= skip_nblock_steps( ray, ip, cd, cdu, step );
 			} else {
 				auto pgid = paging.vaddr.sample_3d<int>( ip );
-				if ( pgid != -1 ) {
-					auto spl = paging.block_sampler[ pgid ].sample_3d<float>( ray.o - ip );
-					auto val = transfer_fn.sample_1d<vec4>( spl );
-					auto col = val * density;
-					pixel.v += col * ( 1.f - pixel.v.w );
-					if ( pixel.v.w > opacity_threshold ) {
-						break;
-					}
-				} else {
-					// ivec3 ipm = mod( ip, vec3( MAXX ) );
-					// absent_coord[ ipm.x ][ ipm.y ][ ipm.z ] = ip;
-					// is_absent[ ipm.x ][ ipm.y ][ ipm.z ] = true;
+				if ( pgid == -1 ) break;
+				
+				auto s_i = paging.block_sampler[ pgid ].sample_3d<float>( ray.o - ip );
+				auto ub_i = transfer_fn.sample_1d<vec4>( s_i );
+				if ( mode == VolumeRenderMode::Partition ) {
+				    vec3 lower = { 1, 0, 0 };
+				    vec3 upper = { 0, 0, 1 };
+					auto v = mix( lower, upper, rank ) *
+						       length( vec3( ub_i ) );
+					ub_i = vec4( v.x, v.y, v.z, ub_i.w );
+				}
+				ub_i *= density;
+				pixel.theta += vec3( ub_i ) * pixel.phi;
+				pixel.phi *= 1.f - ub_i.w;
+				pixel.v += ub_i * ( 1.f - pixel.v.w );
+				if ( pixel.v.w > opacity_threshold ) {
 					break;
 				}
 			}
