@@ -49,7 +49,7 @@ struct VolumeShaderKernel : VolumeShader
 				if ( pgid != -1 ) {
 					auto s_i = paging.block_sampler[ pgid ].sample_3d<float>( ray.o - ip );
 					auto ub_i = transfer_fn.sample_1d<vec4>( s_i ) * density;
-				    pixel.theta += vec3( ub_i ) * pixel.phi;
+					pixel.theta += vec3( ub_i ) * pixel.phi;
 					pixel.phi *= 1.f - ub_i.w;
 					pixel.v += ub_i * ( 1.f - pixel.v.w );
 					if ( pixel.v.w > opacity_threshold ) {

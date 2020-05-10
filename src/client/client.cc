@@ -195,8 +195,11 @@ private:
 	
 	void ui_toolbar()
 	{
-		ImGui::Begin( "Properties" );
+		ImGui::Begin( "Camera" );
+		ui_camera_bar();
+		ImGui::End();
 
+		ImGui::Begin( "Renderer" );
 		auto time = glfwGetTime();
 		if ( isnan( prev ) ) {
 			prev = time;
@@ -205,12 +208,8 @@ private:
 			nframes = 0;
 			prev = time;
 		}
-		
 		ImGui::Text( "FPS: %d", fps );
-
-		ui_camera_bar();
 		ui_renderer_bar();
-
 		ImGui::End();
 
 		update_config();
@@ -218,9 +217,6 @@ private:
 
 	void ui_camera_bar()
 	{
-		if ( !ImGui::CollapsingHeader( "Camera",
-									   ImGuiTreeNodeFlags_DefaultOpen ) ) return;
-
 		vec3 &arm = config.params.camera.orbit->arm;
 		arm.x = radians( arm.x );
 		arm.y = radians( arm.y );

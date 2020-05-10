@@ -19,7 +19,7 @@
         "renderer": "Volume",
         "params": {
             "density": 4e-2,
-            "max_steps": 4000,
+            "max_steps": 40000,
             "transfer_fn": {
 				"preset": "Ice Fire"
             }
