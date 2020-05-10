@@ -1,6 +1,7 @@
 #pragma once
 
 #include <varch/thumbnail.hpp>
+#include <hydrant/dyn_kd_tree.hpp>
 #include <hydrant/basic_renderer.hpp>
 #include <hydrant/double_buffering.hpp>
 #include <hydrant/octree_culler.hpp>
@@ -20,6 +21,11 @@ VM_EXPORT
 		{
 			std::unique_ptr<DbufRtRenderCtx> ctx( create_dbuf_rt_render_ctx() );
 			OctreeCuller culler( this->exhibit, this->chebyshev_thumb );
+
+			std::vector<std::size_t> render_t( comm.size );
+			std::vector<std::pair<float, int>> dist( comm.size );
+			std::vector<int> z_order( comm.size );
+			DynKdTree kd_tree( this->dim, comm.size );
 				
 			FnDoubleBuffering loop_drv(
 			  ImageOptions{}
@@ -27,10 +33,31 @@ VM_EXPORT
 			    .set_resolution( this->resolution ),
 			  loop,
 			  [&]( auto &frame, auto frame_idx ) {
-				  auto bbox = slice_bbox( loop.camera, comm );
+				  auto bbox = kd_tree.search( comm.rank );
 				  culler.set_bbox( bbox );
 				  this->shader.bbox = Box3D{ bbox.min, bbox.max };
-				  dbuf_rt_render_frame( frame, *ctx, loop, culler, comm );
+
+				  auto orig = culler.get_orig( loop.camera );
+				  dist[ comm.rank ].first = dist_point_bbox( orig, this->shader.bbox );
+				  for ( int i = 0; i < comm.size; ++i ) {
+					  MPI_Bcast( &dist[ i ].first, sizeof( float ), MPI_CHAR, i, comm.comm );
+					  dist[ i ].second = i;
+				  }
+				  MPI_Barrier( comm.comm );
+				  std::sort( dist.begin(), dist.end(),
+							 []( auto &x, auto &y ) { return x.first < y.first; } );
+				  std::transform( dist.begin(), dist.end(), z_order.begin(),
+								  []( auto &x ) { return x.second; } );
+
+				  render_t[ comm.rank ] = dbuf_rt_render_frame( frame, *ctx,
+																loop, culler, comm,
+																z_order );
+				  for ( int i = 0; i < comm.size; ++i ) {
+					  MPI_Bcast( &render_t[ i ], sizeof( std::size_t ), MPI_CHAR, i, comm.comm );
+				  }
+				  MPI_Barrier( comm.comm );
+				  
+				  kd_tree.update( render_t );
 			  },
 			  [&]( auto &frame, auto frame_idx ) {
 				  auto fp = frame.fetch_data();
@@ -41,55 +68,25 @@ VM_EXPORT
 		}
 
 	private:
-		BoundingBox slice_bbox( Camera const &camera, MpiComm const &comm )
+		float dist_point_bbox( vec3 const &pt, Box3D const &bbox )
 		{
-			static vec3 axis_map[] = {
-				{ 0, 0, 1 }, { 0, 0, -1 },
-				{ 1, 0, 0 }, { -1, 0, 0 },
-				{ 0, 1, 0 }, { 0, -1, 0 }
+			auto a = bbox.min + .5f;
+			auto b = bbox.max - .5f;
+			float d[] = {
+				distance( pt, vec3( a.x, a.y, a.z ) ),
+				distance( pt, vec3( a.x, a.y, b.z ) ),
+				distance( pt, vec3( a.x, b.y, a.z ) ),
+				distance( pt, vec3( b.x, a.y, a.z ) ),
+				distance( pt, vec3( a.x, b.y, b.z ) ),
+				distance( pt, vec3( b.x, b.y, a.z ) ),
+				distance( pt, vec3( b.x, a.y, b.z ) ),
+				distance( pt, vec3( b.x, b.y, b.z ) ),
 			};
-			auto dist = camera.target - camera.position;
-			int max_idx = -1;
-			float max_dt = -INFINITY;
-			for ( int i = 0; i != 6; ++i ) {
-				auto dt = dot( dist, axis_map[ i ] );
-				if ( dt > max_dt ) {
-					max_idx = i;
-					max_dt = dt;
-				}
+			float res = INFINITY;
+			for ( int i = 0; i < 8; ++i ) {
+				res = min( res, d[ i ] );
 			}
-			ivec3 axis = axis_map[ max_idx ];
-			auto naxis = abs( axis );
-			auto idim = ivec3( this->dim );
-			auto nslices = idim.x * naxis.x + idim.y * naxis.y + idim.z * naxis.z;
-			auto my_slice = deploy_slice( nslices, comm );
-			auto plane = idim * ( 1 - naxis );
-			auto orig = ( axis.x + axis.y + axis.z < 0 ) ? naxis * nslices : ivec3( 0 );
-			auto p0 = orig + axis * my_slice.first;
-			auto p1 = orig + plane + axis * my_slice.second;
-			return BoundingBox{}
-			             .set_min( min( p0, p1 ) )
-				         .set_max( max( p0, p1 ) );
-		}
-
-		std::pair<int, int> deploy_slice( int nslices, MpiComm const &comm )
-		{
-			// at most one slice per slave
-			if ( nslices <= comm.size ) {
-				if ( comm.rank >= nslices ) {
-					return std::make_pair( 0, 0 );
-				} else {
-					return std::make_pair( comm.rank, comm.rank + 1 );
-				}
-			} else {
-				// implement balanced deployment strategy
-				int n = nslices / comm.size;
-				if ( comm.rank == comm.size - 1 ) {
-					return std::make_pair( comm.rank * n, nslices );
-				} else {
-					return std::make_pair( comm.rank * n, comm.rank * n + n );
-				}
-			}
+			return res;
 		}
 		
 	public:
@@ -98,11 +95,12 @@ VM_EXPORT
 			return new DbufRtRenderCtx;
 		}
 
-		virtual void dbuf_rt_render_frame( Image<cufx::StdByte3Pixel> &frame,
+		virtual std::size_t dbuf_rt_render_frame( Image<cufx::StdByte3Pixel> &frame,
 										   DbufRtRenderCtx &ctx,
 										   IRenderLoop &loop,
 										   OctreeCuller &culler,
-										   MpiComm const &comm ) = 0;
+										   MpiComm const &comm,
+										   std::vector<int> const &z_order ) = 0;
 
 	protected:
 		std::shared_ptr<vol::Thumbnail<int>> chebyshev_thumb;

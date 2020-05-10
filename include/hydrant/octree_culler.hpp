@@ -104,7 +104,8 @@ VM_EXPORT
 			{
 				this->bbox = bbox;
 			} else {
-				LOG( FATAL ) << vm::fmt( "invalid bbox: {}", std::make_pair( bbox.min, bbox.max ) );
+				LOG( FATAL ) << vm::fmt( "invalid bbox = {}; with dim ={}",
+										 std::make_pair( bbox.min, bbox.max ), dim );
 			}
 		}
 
@@ -148,6 +149,12 @@ VM_EXPORT
 			buf.resize( length );
 			std::sort( buf.begin(), buf.end() );
 			return buf;
+		}
+
+		vec3 get_orig( Camera camera ) const
+		{
+			auto itrans = exhibit.get_iet() * camera.get_ivt();
+			return itrans * vec4( 0, 0, 0, 1 );
 		}
 
 	private:

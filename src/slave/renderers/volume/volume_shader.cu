@@ -54,7 +54,7 @@ struct VolumeShaderKernel : VolumeShader
 				    vec3 lower = { 1, 0, 0 };
 				    vec3 upper = { 0, 0, 1 };
 					auto v = mix( lower, upper, rank ) *
-						       length( vec3( ub_i ) );
+						       float( length( vec3( ub_i ) ) );
 					ub_i = vec4( v.x, v.y, v.z, ub_i.w );
 				}
 				ub_i *= density;
