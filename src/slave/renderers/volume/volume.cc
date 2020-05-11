@@ -62,7 +62,6 @@ void VolumeRenderer::update( vm::json::Any const &params_in )
 	auto params = params_in.get<VolumeRendererParams>();
 	mem_limit_mb = params.mem_limit_mb;
 	shader.mode = params.mode;
-	shader.density = params.density;
 	if ( params.transfer_fn.values.size() ) {
 		transfer_fn = TransferFn( params.transfer_fn, device );
 		shader.transfer_fn = transfer_fn.sampler();
@@ -173,6 +172,14 @@ DbufRtRenderCtx *VolumeRenderer::create_dbuf_rt_render_ctx()
 	return ctx;
 }
 
+float linear_to_srgb( float x )
+{
+	if ( x <= 0.0031308f ) {
+		return 12.92f * x;
+	}
+	return 1.055f * pow( x, 1.f / 2.4f ) - 0.055f;
+}
+
 std::size_t VolumeRenderer::dbuf_rt_render_frame( Image<cufx::StdByte3Pixel> &frame,
 										   DbufRtRenderCtx &ctx_in,
 										   IRenderLoop &loop,
@@ -271,9 +278,12 @@ std::size_t VolumeRenderer::dbuf_rt_render_frame( Image<cufx::StdByte3Pixel> &fr
 	auto tmp_view = ctx.tmp->view();
 	for ( int j = 0; j != s_height; ++j ) {
 		for ( int i = 0; i != recv_view.width(); ++i ) {
-			auto val = saturate( recv_view.at_host( i, j + f0 ).val );
-			reinterpret_cast<uchar3&>( tmp_view.at_host( i, j ) ) =
-				uchar3{ val.x, val.y, val.z };
+			auto &v = recv_view.at_host( i, j + f0 ).val;
+			v.x = linear_to_srgb( v.x );
+			v.y = linear_to_srgb( v.y );
+			v.z = linear_to_srgb( v.z );
+			auto val = saturate( v );
+			reinterpret_cast<uchar3&>( tmp_view.at_host( i, j ) ) = uchar3{ val.x, val.y, val.z };
 		}
 	}
 		

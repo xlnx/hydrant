@@ -25,7 +25,6 @@ struct VolumeShader : IShader<VolumePixel>
 {
 	VolumeRenderMode mode;
 	float rank;
-	float density;
 	Sampler transfer_fn;
 	Sampler chebyshev;
 	BlockPaging paging;

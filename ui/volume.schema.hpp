@@ -16,6 +16,5 @@ struct VolumeRendererParams : vm::json::Serializable<VolumeRendererParams>
 {
 	VM_JSON_FIELD( VolumeRenderMode, mode ) = VolumeRenderMode::Default;
 	VM_JSON_FIELD( TransferFnConfig, transfer_fn );
-	VM_JSON_FIELD( float, density ) = 1e-2f;
 	VM_JSON_FIELD( std::size_t, mem_limit_mb ) = 1024 * 2;
 };

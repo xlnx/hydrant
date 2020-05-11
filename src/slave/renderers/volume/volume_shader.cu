@@ -33,7 +33,7 @@ struct VolumeShaderKernel : VolumeShader
 	  main( Pixel &pixel_in_out ) const
 	{
 		const auto cdu = 1.f / compMax( abs( pixel_in_out.ray.d ) );
-		const auto opacity_threshold = 0.95f;
+		// const auto opacity_threshold = 0.999f;
 
 		auto pixel = pixel_in_out;
 		auto &ray = pixel.ray;
@@ -50,6 +50,7 @@ struct VolumeShaderKernel : VolumeShader
 				
 				auto s_i = paging.block_sampler[ pgid ].sample_3d<float>( ray.o - ip );
 				auto ub_i = transfer_fn.sample_1d<vec4>( s_i );
+				ub_i *= vec4( ub_i.w, ub_i.w, ub_i.w, 1 );
 				if ( mode == VolumeRenderMode::Partition ) {
 				    vec3 lower = { 1, 0, 0 };
 				    vec3 upper = { 0, 0, 1 };
@@ -57,13 +58,12 @@ struct VolumeShaderKernel : VolumeShader
 						       float( length( vec3( ub_i ) ) );
 					ub_i = vec4( v.x, v.y, v.z, ub_i.w );
 				}
-				ub_i *= density;
 				pixel.theta += vec3( ub_i ) * pixel.phi;
 				pixel.phi *= 1.f - ub_i.w;
 				pixel.v += ub_i * ( 1.f - pixel.v.w );
-				if ( pixel.v.w > opacity_threshold ) {
-					break;
-				}
+				// if ( pixel.v.w > opacity_threshold ) {
+				// 	break;
+				// }
 			}
 			ray.o += ray.d * step;
 			nsteps -= 1;
