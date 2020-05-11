@@ -26,11 +26,12 @@ protected:
 protected:
 	DbufRtRenderCtx *create_dbuf_rt_render_ctx() override;
 	
-	void dbuf_rt_render_frame( Image<cufx::StdByte3Pixel> &frame,
+	std::size_t dbuf_rt_render_frame( Image<cufx::StdByte3Pixel> &frame,
 							   DbufRtRenderCtx &ctx,
 							   IRenderLoop &loop,
 							   OctreeCuller &culler,
-							   MpiComm const &comm ) override;
+							   MpiComm const &comm,
+							   std::vector<int> const &z_order ) override;
 
 private:
 	std::size_t mem_limit_mb;
@@ -61,7 +62,6 @@ void VolumeRenderer::update( vm::json::Any const &params_in )
 	auto params = params_in.get<VolumeRendererParams>();
 	mem_limit_mb = params.mem_limit_mb;
 	shader.mode = params.mode;
-	shader.density = params.density;
 	if ( params.transfer_fn.values.size() ) {
 		transfer_fn = TransferFn( params.transfer_fn, device );
 		shader.transfer_fn = transfer_fn.sampler();
@@ -138,6 +138,7 @@ struct VolumeRtRenderCtx : DbufRtRenderCtx
 	Image<VolumeShader::Pixel> film;
 	Image<VolumeFetchPixel> local;
 	Image<VolumeFetchPixel> recv;
+	std::shared_ptr<Image<cufx::StdByte3Pixel>> tmp;
 	std::unique_ptr<RtBlockPagingServer> srv;
 
 public:
@@ -171,22 +172,40 @@ DbufRtRenderCtx *VolumeRenderer::create_dbuf_rt_render_ctx()
 	return ctx;
 }
 
-void VolumeRenderer::dbuf_rt_render_frame( Image<cufx::StdByte3Pixel> &frame,
+float linear_to_srgb( float x )
+{
+	if ( x <= 0.0031308f ) {
+		return 12.92f * x;
+	}
+	return 1.055f * pow( x, 1.f / 2.4f ) - 0.055f;
+}
+
+std::size_t VolumeRenderer::dbuf_rt_render_frame( Image<cufx::StdByte3Pixel> &frame,
 										   DbufRtRenderCtx &ctx_in,
 										   IRenderLoop &loop,
 										   OctreeCuller &culler,
-										   MpiComm const &comm )
+										   MpiComm const &comm,
+										   std::vector<int> const &z_order )
 {
 	auto &ctx = static_cast<VolumeRtRenderCtx &>( ctx_in );
 
+	std::size_t render_t;
+	
 	std::size_t ns0, ns1, ns2;
 
 	shader.rank = float( comm.rank ) / ( comm.size - 1 );
 	shader.paging = ctx.srv->update( culler, loop.camera );
+
+	if ( !ctx.tmp ) {
+		ctx.tmp.reset( new Image<cufx::StdByte3Pixel>( ImageOptions{}
+		                                    .set_resolution( resolution.x,
+															 resolution.y / comm.size ) ) );
+	}
 	
 	auto opts = RaycastingOptions{}.set_device( device );
 	{
 		vm::Timer::Scoped timer( [&]( auto dt ) {
+				render_t = dt.ns().cnt();
 				ns0 = dt.ns().cnt();
 			} );
 		
@@ -221,41 +240,72 @@ void VolumeRenderer::dbuf_rt_render_frame( Image<cufx::StdByte3Pixel> &frame,
 			}
 		} );
 
-	for ( int i = 1; i < comm.size; ++i ) {
-		if ( comm.rank == i ) {
-			MPI_Send( &ctx.local.view().at_host( 0, 0 ), ctx.local.bytes(),
-					  MPI_CHAR, 0, 0, comm.comm );
-		} else if ( comm.rank == 0 ) {
-			MPI_Recv( &ctx.recv.view().at_host( 0, 0 ), ctx.recv.bytes(),
-					  MPI_CHAR, i, 0, comm.comm, MPI_STATUS_IGNORE );
-			auto local_view = ctx.local.view();
-			auto recv_view = ctx.recv.view();
-			for ( int j = 0; j != local_view.height(); ++j ) {
-				for ( int i = 0; i != local_view.width(); ++i ) {
-					auto &local = local_view.at_host( i, j );
-					auto &recv = recv_view.at_host( i, j );
-					auto v_n = vec3( local.val ) + vec3( recv.val ) -
-						local.val.w * recv.theta;
-					auto a_n = recv.phi * local.val.w + recv.val.w;
-					local.val = vec4( v_n.x, v_n.y, v_n.z, a_n );
-				}
+	auto local_view = ctx.local.view();
+	auto recv_view = ctx.recv.view();
+	auto s_height = ctx.recv.view().height() / comm.size;
+	auto s_bytes = ctx.recv.bytes() / recv_view.height() * s_height;
+
+	for ( int i = 0; i < comm.size; ++i ) {
+		if ( i != comm.rank ) {
+			MPI_Request r1, r2;
+			MPI_Isend( &local_view.at_host( 0, i * s_height ), s_bytes,
+					   MPI_CHAR, i, 0, comm.comm, &r1 );
+			MPI_Irecv( &recv_view.at_host( 0, i * s_height ), s_bytes,
+					   MPI_CHAR, i, 0, comm.comm, &r2 );
+			MPI_Wait( &r1, MPI_STATUS_IGNORE );
+			MPI_Wait( &r2, MPI_STATUS_IGNORE );
+		} else {
+			memcpy( &recv_view.at_host( 0, i * s_height ),
+					&local_view.at_host( 0, i * s_height ), s_bytes );
+		}
+	}
+
+	auto f0 = z_order[ 0 ] * s_height;
+	for ( int k = 1; k < comm.size; ++k ) {
+		auto f1 = z_order[ k ] * s_height;
+		for ( int j = 0; j < s_height; ++j ) {
+			for ( int i = 0; i < recv_view.width(); ++i ) {
+				auto &front = recv_view.at_host( i, j + f0 );
+				auto &back = recv_view.at_host( i, j + f1 );
+				auto v_n = vec3( front.val ) + vec3( back.val ) -
+					front.val.w * back.theta;
+				auto a_n = back.phi * front.val.w + back.val.w;
+				front.val = vec4( v_n.x, v_n.y, v_n.z, a_n );
 			}
 		}
 	}
 
-	if ( comm.rank == 0 ) {
-		auto local_view = ctx.local.view();
-		auto frame_view = frame.view();
-		for ( int j = 0; j != local_view.height(); ++j ) {
-			for ( int i = 0; i != local_view.width(); ++i ) {
-				auto val = saturate( local_view.at_host( i, j ).val );
-				reinterpret_cast<uchar3&>( frame_view.at_host( i, j ) ) =
-					uchar3{ val.x, val.y, val.z };
-			}
+	auto tmp_view = ctx.tmp->view();
+	for ( int j = 0; j != s_height; ++j ) {
+		for ( int i = 0; i != recv_view.width(); ++i ) {
+			auto &v = recv_view.at_host( i, j + f0 ).val;
+			v.x = linear_to_srgb( v.x );
+			v.y = linear_to_srgb( v.y );
+			v.z = linear_to_srgb( v.z );
+			auto val = saturate( v );
+			reinterpret_cast<uchar3&>( tmp_view.at_host( i, j ) ) = uchar3{ val.x, val.y, val.z };
 		}
+	}
+		
+	auto frame_view = frame.view();
+	auto t_bytes = ctx.tmp->bytes();
+	for ( int i = 1; i < comm.size; ++i ) {
+		if ( comm.rank == 0 ) {
+			MPI_Recv( &frame_view.at_host( 0, i * s_height ), t_bytes,
+					  MPI_CHAR, i, 0, comm.comm, MPI_STATUS_IGNORE );
+		} else {
+			MPI_Send( &tmp_view.at_host( 0, 0 ), t_bytes,
+					  MPI_CHAR, 0, 0, comm.comm );
+		}
+	}
+	if ( comm.rank == 0 ) {
+		memcpy( &frame_view.at_host( 0, 0 ),
+				&tmp_view.at_host( 0, 0 ), t_bytes );
 	}
 
 	MPI_Barrier( comm.comm );
+
+	return render_t;
 }
 
 REGISTER_RENDERER( VolumeRenderer, "Volume" );

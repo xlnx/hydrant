@@ -26,11 +26,12 @@ protected:
 protected:
 	DbufRtRenderCtx *create_dbuf_rt_render_ctx() override;
 	
-	void dbuf_rt_render_frame( Image<cufx::StdByte3Pixel> &frame,
+	std::size_t dbuf_rt_render_frame( Image<cufx::StdByte3Pixel> &frame,
 							   DbufRtRenderCtx &ctx,
 							   IRenderLoop &loop,
 							   OctreeCuller &culler,
-							   MpiComm const &comm ) override;
+							   MpiComm const &comm,
+							   std::vector<int> const &z_order ) override;
 
 private:
 	std::size_t mem_limit_mb;
@@ -179,13 +180,16 @@ DbufRtRenderCtx *IsosurfaceRenderer::create_dbuf_rt_render_ctx()
 	return ctx;
 }
 
-void IsosurfaceRenderer::dbuf_rt_render_frame( Image<cufx::StdByte3Pixel> &frame,
+std::size_t IsosurfaceRenderer::dbuf_rt_render_frame( Image<cufx::StdByte3Pixel> &frame,
 											   DbufRtRenderCtx &ctx_in,
 											   IRenderLoop &loop,
 											   OctreeCuller &culler,
-											   MpiComm const &comm )
+											   MpiComm const &comm,
+											   std::vector<int> const &z_order )
 {
 	auto &ctx = static_cast<IsosurfaceRtRenderCtx &>( ctx_in );
+
+	std::size_t render_t;
 	
 	std::size_t ns0, ns1, ns2;
 
@@ -200,6 +204,7 @@ void IsosurfaceRenderer::dbuf_rt_render_frame( Image<cufx::StdByte3Pixel> &frame
 	auto opts = RaycastingOptions{}.set_device( device );
 	{
 		vm::Timer::Scoped timer( [&]( auto dt ) {
+				render_t = dt.ns().cnt();
 				ns0 = dt.ns().cnt();
 			} );
 
@@ -276,6 +281,8 @@ void IsosurfaceRenderer::dbuf_rt_render_frame( Image<cufx::StdByte3Pixel> &frame
 	}
 	
 	MPI_Barrier( comm.comm );
+
+	return render_t;
 }
 
 REGISTER_RENDERER( IsosurfaceRenderer, "Isosurface" );

@@ -27,7 +27,6 @@ struct VolumeUi : IUiTyped<VolumeRendererParams>
 			}
 			ImGui::EndCombo();
 		}
-		ImGui::InputFloat( "Density", &params.density );
 		tfn_widget.draw_ui();
 	}
 private:
