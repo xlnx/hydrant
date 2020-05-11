@@ -12,6 +12,8 @@ execute_process(COMMAND ${GIT_EXECUTABLE} submodule update --init --recursive)
 # install external modules
 include(scripts/external.cmake)
 
+#find_package(OpenMP REQUIRED)
+#set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
 find_package(CUDA REQUIRED)
 set(CUDA_ATTACH_VS_BUILD_RULE_TO_CUDA_FILE ON)
 set(CUDA_SEPARABLE_COMPILATION ON)

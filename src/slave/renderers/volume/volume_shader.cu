@@ -65,8 +65,8 @@ struct VolumeShaderKernel : VolumeShader
 				// 	break;
 				// }
 			}
-			ray.o += ray.d * step;
-			nsteps -= 1;
+			ray.o += ray.d * step * 4.f;
+			nsteps -= 4;
 		}
 		pixel_in_out = pixel;
 	}

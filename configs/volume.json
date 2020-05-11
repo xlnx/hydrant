@@ -21,7 +21,7 @@
             "density": 4e-2,
             "max_steps": 40000,
             "transfer_fn": {
-				"preset": "Ice Fire"
+				"preset": "Jet"
             }
         }
     }

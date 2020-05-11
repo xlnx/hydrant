@@ -8,4 +8,4 @@ fi
 set -o xtrace
 
 #mpirun --mca orte_base_help_aggregate 0 -n 1 hydra-zookeeper : --hostfile $1 -np $(cat $1 | wc -l) hydra-slave
-mpirun --mca orte_base_help_aggregate 0 -n 1 hydra-zookeeper : --hostfile $1 -np 2 hydra-slave
+mpirun --mca orte_base_help_aggregate 0 -n 1 hydra-zookeeper : --hostfile $1 -np 4 hydra-slave

@@ -18,12 +18,12 @@ VM_EXPORT
 	struct DbufRenderer : BasicRenderer<Shader>
 	{
 		void realtime_render_dynamic( IRenderLoop &loop, MpiComm const &comm )
-		{
+		{			
 			std::unique_ptr<DbufRtRenderCtx> ctx( create_dbuf_rt_render_ctx() );
 			OctreeCuller culler( this->exhibit, this->chebyshev_thumb );
 
 			std::vector<std::size_t> render_t( comm.size );
-			std::vector<std::pair<float, int>> dist( comm.size );
+			std::vector<std::pair<int, int>> dist( comm.size );
 			std::vector<int> z_order( comm.size );
 			DynKdTree kd_tree( this->dim, comm.size );
 				
@@ -33,14 +33,12 @@ VM_EXPORT
 			    .set_resolution( this->resolution ),
 			  loop,
 			  [&]( auto &frame, auto frame_idx ) {
-				  auto bbox = kd_tree.search( comm.rank );
+				  auto orig = culler.get_orig( loop.camera );
+				  auto bbox = kd_tree.search( comm.rank, orig, dist[ comm.rank ].first );
 				  culler.set_bbox( bbox );
 				  this->shader.bbox = Box3D{ bbox.min, bbox.max };
-
-				  auto orig = culler.get_orig( loop.camera );
-				  dist[ comm.rank ].first = dist_point_bbox( orig, this->shader.bbox );
 				  for ( int i = 0; i < comm.size; ++i ) {
-					  MPI_Bcast( &dist[ i ].first, sizeof( float ), MPI_CHAR, i, comm.comm );
+					  MPI_Bcast( &dist[ i ].first, sizeof( int ), MPI_CHAR, i, comm.comm );
 					  dist[ i ].second = i;
 				  }
 				  MPI_Barrier( comm.comm );
@@ -67,28 +65,6 @@ VM_EXPORT
 			loop_drv.run();
 		}
 
-	private:
-		float dist_point_bbox( vec3 const &pt, Box3D const &bbox )
-		{
-			auto a = bbox.min + .5f;
-			auto b = bbox.max - .5f;
-			float d[] = {
-				distance( pt, vec3( a.x, a.y, a.z ) ),
-				distance( pt, vec3( a.x, a.y, b.z ) ),
-				distance( pt, vec3( a.x, b.y, a.z ) ),
-				distance( pt, vec3( b.x, a.y, a.z ) ),
-				distance( pt, vec3( a.x, b.y, b.z ) ),
-				distance( pt, vec3( b.x, b.y, a.z ) ),
-				distance( pt, vec3( b.x, a.y, b.z ) ),
-				distance( pt, vec3( b.x, b.y, b.z ) ),
-			};
-			float res = INFINITY;
-			for ( int i = 0; i < 8; ++i ) {
-				res = min( res, d[ i ] );
-			}
-			return res;
-		}
-		
 	public:
 		virtual DbufRtRenderCtx *create_dbuf_rt_render_ctx()
 		{
