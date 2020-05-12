@@ -29,8 +29,7 @@
                 0
             ],
             "isovalue": 0.3,
-            "mode": "Color",
-            "max_steps": 4000
+            "mode": "Color"
         }
     }
 }

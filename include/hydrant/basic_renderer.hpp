@@ -53,8 +53,6 @@ VM_EXPORT
 					}
 				}
 			}
-			shader.max_steps = params.max_steps;
-			clear_color = params.clear_color;
 
 			auto &lvl0 = dataset->meta.sample_levels[ 0 ];
 			auto blksz = float( dataset->meta.block_size );
@@ -70,8 +68,10 @@ VM_EXPORT
 						.set_size( f_dim );
 
 			shader.bbox = Box3D{ { 0, 0, 0 }, f_dim };
-			shader.step = .3f / blksz;
+			shader.du = 1.f / blksz;
 
+			update( cfg.params );
+			
 			return true;
 		}
 
@@ -79,6 +79,7 @@ VM_EXPORT
 		{
 			auto params = params_in.get<BasicRendererParams>();
 			shader.max_steps = params.max_steps;
+			shader.step = shader.du / params.sample_rate;
 			clear_color = params.clear_color;
 		}
 

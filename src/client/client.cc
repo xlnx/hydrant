@@ -231,6 +231,7 @@ private:
 	{
 		if ( ImGui::CollapsingHeader( "Basic", ImGuiTreeNodeFlags_DefaultOpen ) ) {
 			auto params = config.params.render.params.get<BasicRendererParams>();
+			ImGui::SliderFloat( "Sample Rate", &params.sample_rate, 0.05, 1 );
 			ImGui::InputInt( "Max Steps", &params.max_steps );
 			ImGui::ColorEdit3( "Background", reinterpret_cast<float *>( &params.clear_color.data ) );
 			if ( ImGui::Button( "Use Window Background" ) ) {

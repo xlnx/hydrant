@@ -138,7 +138,7 @@ struct VolumeRtRenderCtx : DbufRtRenderCtx
 	Image<VolumeShader::Pixel> film;
 	Image<VolumeFetchPixel> local;
 	Image<VolumeFetchPixel> recv;
-	std::shared_ptr<Image<cufx::StdByte3Pixel>> tmp;
+	std::unique_ptr<Image<cufx::StdByte3Pixel>> tmp;
 	std::unique_ptr<RtBlockPagingServer> srv;
 
 public:
@@ -264,9 +264,7 @@ std::size_t VolumeRenderer::dbuf_rt_render_frame( Image<cufx::StdByte3Pixel> &fr
 		}
 	}
 	
-	auto f0 = z_order[ 0 ] * s_height;
-	auto tmp_view = ctx.tmp->view();
-		
+	auto f0 = z_order[ 0 ] * s_height;		
 	for ( int k = 1; k < comm.size; ++k ) {
 		auto f1 = z_order[ k ] * s_height;
 		for ( int j = 0; j < s_height; ++j ) {
@@ -280,6 +278,7 @@ std::size_t VolumeRenderer::dbuf_rt_render_frame( Image<cufx::StdByte3Pixel> &fr
 			}
 		}
 	}
+	auto tmp_view = ctx.tmp->view();
 	for ( int j = 0; j < s_height; ++j ) {
 		for ( int i = 0; i < recv_view.width(); ++i ) {
 			auto &v = recv_view.at_host( i, j + f0 ).val;
