@@ -51,14 +51,20 @@ struct VolumeShaderKernel : VolumeShader
 				
 				auto s_i = paging.block_sampler[ pgid ].sample_3d<float>( ray.o - ip );
 				auto ub_i = transfer_fn.sample_1d<vec4>( s_i );
-				ub_i *= vec4( ub_i.w, ub_i.w, ub_i.w, 1 );
 				if ( mode == VolumeRenderMode::Partition ) {
 				    vec3 lower = { 1, 0, 0 };
 				    vec3 upper = { 0, 0, 1 };
 					auto v = mix( lower, upper, rank ) *
 						       float( length( vec3( ub_i ) ) );
 					ub_i = vec4( v.x, v.y, v.z, ub_i.w );
+				} else if ( mode == VolumeRenderMode::Paging ) {
+					if ( pgid >= paging.lowest_blkcnt ) {
+						ub_i = vec4( 0, 1, 0, ub_i.w );
+					} else {
+						ub_i = vec4( 1, 0, 0, ub_i.w );
+					}
 				}
+				ub_i *= vec4( ub_i.w, ub_i.w, ub_i.w, 1 );
 				pixel.theta += vec3( ub_i ) * pixel.phi;
 				pixel.phi *= 1.f - ub_i.w;
 				pixel.v += ub_i * ( 1.f - pixel.v.w );

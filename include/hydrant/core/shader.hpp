@@ -121,6 +121,8 @@ __host__ __device__ void
 	pixel.ray = ray_in;
 	float tnear, tfar;
 	if ( pixel.ray.intersect( shader.bbox, tnear, tfar ) ) {
+		if ( tnear < 0 ) tnear = 0;
+		if ( tfar < 0 ) tfar = 0;
 		pixel.ray.o += pixel.ray.d * tnear;
 		pixel.nsteps = min( shader.max_steps, int( ( tfar - tnear ) / shader.step ) );
 		pixel.step_size = 1;

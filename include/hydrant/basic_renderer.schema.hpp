@@ -13,7 +13,7 @@ VM_EXPORT
 	{
 		VM_JSON_FIELD( ShadingDevice, device ) = ShadingDevice::Cuda;
 		VM_JSON_FIELD( int, comm_rank ) = 0;
-		VM_JSON_FIELD( float, sample_rate ) = 0.2;
+		VM_JSON_FIELD( float, sample_rate ) = 1.0;
 		VM_JSON_FIELD( int, max_steps ) = 4000000;
 		VM_JSON_FIELD( vec3, clear_color ) = vec3( 0 );
 	};

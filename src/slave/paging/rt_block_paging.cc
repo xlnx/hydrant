@@ -230,11 +230,12 @@ RtBlockPagingServerImpl::RtBlockPagingServerImpl( RtBlockPagingServerOptions con
 						  .set_device( opts.device )
 						  .set_opts( opts.storage_opts );
 
-	auto mem_limit_bytes = opts.mem_limit_mb * 1024 * 1024;
+	auto mem_limit_bytes = uint64_t(opts.mem_limit_mb) * 1024 * 1024;
 	auto block_bytes = pad_bs * pad_bs * pad_bs;
 	max_block_count = mem_limit_bytes / block_bytes;
 	max_block_count = std::min( max_block_count, MAX_SAMPLER_COUNT - lowest_blocks.size() );
 
+	LOG( INFO ) << vm::fmt( "MEM_LIMIT_MB = {}", opts.mem_limit_mb );
 	LOG( INFO ) << vm::fmt( "MEM_LIMIT_BYTES = {}", mem_limit_bytes );
 	LOG( INFO ) << vm::fmt( "BLOCK_BYTES = {}", block_bytes );
 	LOG( INFO ) << vm::fmt( "MAX_BLOCK_COUNT = {}", max_block_count );

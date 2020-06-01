@@ -1,11 +1,21 @@
 {
     "camera": {
-        "orbit": {
-            "arm": [
-                0,
+        "ptu": {
+            "position": [
+                2,
                 0,
                 2.2
-            ]
+            ],
+			"target": [
+				0,
+				0,
+				0
+			],
+			"up": [
+				0,
+				1,
+				0
+			]
         },
         "perspective": {
             "fovy": 60
@@ -13,12 +23,12 @@
     },
     "render": {
         "resolution": [
-            512,
-            512
+            1024,
+            768
         ],
         "renderer": "Volume",
         "params": {
-            "density": 4e-2,
+			"mem_limit_mb": 10000,
             "transfer_fn": {
 				"preset": "Jet"
             }

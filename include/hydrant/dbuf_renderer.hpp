@@ -34,6 +34,7 @@ VM_EXPORT
 			  loop,
 			  [&]( auto &frame, auto frame_idx ) {
 				  auto orig = culler.get_orig( loop.camera );
+				  // vm::println("orig = {}", orig);
 				  auto bbox = kd_tree.search( comm.rank, orig, dist[ comm.rank ].first );
 				  culler.set_bbox( bbox );
 				  this->shader.bbox = Box3D{ bbox.min, bbox.max };

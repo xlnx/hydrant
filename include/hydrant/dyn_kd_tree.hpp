@@ -5,13 +5,43 @@
 
 VM_BEGIN_MODULE( hydrant )
 
+#define SAMPLE_PTS 20
+
 VM_EXPORT
 {
+	struct Ratio
+	{
+		Ratio() :
+			val( SAMPLE_PTS, 0.5 ),
+			idx( 0 ),
+			num( SAMPLE_PTS )
+		{
+			for ( auto &x: val ) { sum += x; }
+		}
+
+		void update( float v )
+		{
+			sum -= val[ idx ];
+			sum += val[ idx ] = v;
+			idx = ( idx + 1 ) % num;
+		}
+
+		float value() const
+		{
+			return sum / num;
+		}
+
+	private:
+		std::vector<float> val;
+		int idx, num;
+		float sum = 0;
+	};
+	
 	struct KdNode
 	{
 		std::unique_ptr<KdNode> left, right;
 		int rank, axis, mid;
-		float ratio;
+		Ratio ratio;
 
 	public:
 		void update_by_ratio( BoundingBox const &parent,
@@ -21,12 +51,16 @@ VM_EXPORT
 			left = right = parent;
 			vec3 minp = parent.min;
 			vec3 maxp = parent.max;
-			vec3 midp_f = minp * ( 1 - ratio ) + maxp * ratio;
+			vec3 midp_f = minp * ( 1 - ratio.value() ) + maxp * ratio.value();
 			ivec3 midp = round( midp_f );
+			int mid1;
 			switch ( axis ) {
-			case 0: mid = left.max.x = right.min.x = midp.x; break;
-			case 1: mid = left.max.y = right.min.z = midp.y; break;
-			case 2: mid = left.max.z = right.min.z = midp.z; break;
+			case 0: mid1 = left.max.x = right.min.x = midp.x; break;
+			case 1: mid1 = left.max.y = right.min.z = midp.y; break;
+			case 2: mid1 = left.max.z = right.min.z = midp.z; break;
+			}
+			if ( abs( mid1 - mid ) > 1 ) {
+				mid = mid1;
 			}
 		}
 	};
@@ -87,10 +121,9 @@ VM_EXPORT
 			auto r_t = sum.range_sum( node->rank, high );
 
 			const float speed = 0.1;
-			double l = node->ratio / double( l_t );
-			double r = ( 1 - node->ratio ) / double( r_t );
-			node->ratio = speed * l / ( l + r ) + ( 1 - speed ) * node->ratio;
-			//			vm::println( "node.ratio = {}", node->ratio );
+			double l = node->ratio.value() * double( r_t );
+			double r = ( 1 - node->ratio.value() ) * double( l_t );
+			node->ratio.update( speed * l / ( l + r ) + ( 1 - speed ) * node->ratio.value() );
 			BoundingBox bbox_l, bbox_r;
 			node->update_by_ratio( bbox, bbox_l, bbox_r );
 			
@@ -144,7 +177,6 @@ VM_EXPORT
 				auto node = new KdNode;
 				auto rank = ( high_rank + low_rank ) / 2;
 				auto next_axis = ( axis + 1 ) % 3;
-				node->ratio = .5f;
 				node->rank = rank;
 				node->axis = axis;
 				BoundingBox bbox_l, bbox_r;

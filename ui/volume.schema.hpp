@@ -10,7 +10,8 @@ using namespace hydrant;
 
 VM_ENUM( VolumeRenderMode,
 		 Default,
-		 Partition );
+		 Partition,
+		 Paging );
 
 struct VolumeRendererParams : vm::json::Serializable<VolumeRendererParams>
 {

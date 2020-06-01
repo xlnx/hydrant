@@ -37,6 +37,14 @@ struct Frustum
 				}
 			}
 		}
+		auto b3d = Box3D{}.set_min( bbox.min ).set_max( bbox.max );
+		for ( int i = 0; i != 4; ++i ) {
+			auto ray = Ray{}.set_o( orig ).set_d( normalize( border[ i ] ) );
+			float tnear, tfar;
+			if ( ray.intersect( b3d, tnear, tfar ) && tfar > 0.f ) {
+				return true;
+			}
+		}
 		return false;
 	}
 
@@ -61,6 +69,7 @@ struct Frustum
 
 public:
 	std::array<vec3, 4> norm;
+	std::array<vec3, 4> border;
 	vec3 orig;
 };
 
@@ -182,19 +191,17 @@ VM_EXPORT
 							  ScreenRect const &rect,
 							  mat4 const &trans ) const
 		{
-			vec3 border[ 4 ] = {
-				{ rect.max.x, rect.max.y, -camera.ctg_fovy_2 },
-				{ rect.max.x, rect.min.y, -camera.ctg_fovy_2 },
-				{ rect.min.x, rect.min.y, -camera.ctg_fovy_2 },
-				{ rect.min.x, rect.max.y, -camera.ctg_fovy_2 },
-			};
-
 			Frustum frust;
+			frust.border[ 0 ] = vec3{ rect.max.x, rect.max.y, -camera.ctg_fovy_2 };
+			frust.border[ 1 ] = vec3{ rect.max.x, rect.min.y, -camera.ctg_fovy_2 };
+			frust.border[ 2 ] = vec3{ rect.min.x, rect.min.y, -camera.ctg_fovy_2 };
+			frust.border[ 3 ] = vec3{ rect.min.x, rect.max.y, -camera.ctg_fovy_2 };
+
 			frust.orig = vec3( 0 );
-			frust.norm[ 0 ] = cross( border[ 0 ], border[ 1 ] );
-			frust.norm[ 1 ] = cross( border[ 1 ], border[ 2 ] );
-			frust.norm[ 2 ] = cross( border[ 2 ], border[ 3 ] );
-			frust.norm[ 3 ] = cross( border[ 3 ], border[ 0 ] );
+			frust.norm[ 0 ] = cross( frust.border[ 0 ], frust.border[ 1 ] );
+			frust.norm[ 1 ] = cross( frust.border[ 1 ], frust.border[ 2 ] );
+			frust.norm[ 2 ] = cross( frust.border[ 2 ], frust.border[ 3 ] );
+			frust.norm[ 3 ] = cross( frust.border[ 3 ], frust.border[ 0 ] );
 
 			frust.orig = trans * vec4( frust.orig, 1 );
 			for ( auto &norm : frust.norm ) {

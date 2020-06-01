@@ -79,7 +79,7 @@ VM_EXPORT
 		{
 			auto params = params_in.get<BasicRendererParams>();
 			shader.max_steps = params.max_steps;
-			shader.step = shader.du / params.sample_rate;
+			shader.step = shader.du / 4.f / params.sample_rate;
 			clear_color = params.clear_color;
 		}
 
