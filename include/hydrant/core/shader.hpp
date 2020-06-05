@@ -17,7 +17,8 @@ struct IShaderTypeErased
 {
 	Box3D bbox;
 	float step;
-	int max_steps = 500;
+	float du;
+	int max_steps;
 };
 
 VM_EXPORT
@@ -28,6 +29,8 @@ VM_EXPORT
 		Ray ray;
 		/* maximum march steps left */
 		int nsteps;
+		/* step size */
+		int step_size;
 	};
 
 	template <typename P>
@@ -118,11 +121,15 @@ __host__ __device__ void
 	pixel.ray = ray_in;
 	float tnear, tfar;
 	if ( pixel.ray.intersect( shader.bbox, tnear, tfar ) ) {
+		if ( tnear < 0 ) tnear = 0;
+		if ( tfar < 0 ) tfar = 0;
 		pixel.ray.o += pixel.ray.d * tnear;
 		pixel.nsteps = min( shader.max_steps, int( ( tfar - tnear ) / shader.step ) );
+		pixel.step_size = 1;
 		shader.main( pixel );
 	} else {
 		pixel.nsteps = 0;
+		pixel.step_size = 1;
 		shader.miss( pixel );
 	}
 

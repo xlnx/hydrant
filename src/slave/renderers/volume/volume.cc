@@ -138,7 +138,7 @@ struct VolumeRtRenderCtx : DbufRtRenderCtx
 	Image<VolumeShader::Pixel> film;
 	Image<VolumeFetchPixel> local;
 	Image<VolumeFetchPixel> recv;
-	std::shared_ptr<Image<cufx::StdByte3Pixel>> tmp;
+	std::unique_ptr<Image<cufx::StdByte3Pixel>> tmp;
 	std::unique_ptr<RtBlockPagingServer> srv;
 
 public:
@@ -232,11 +232,11 @@ std::size_t VolumeRenderer::dbuf_rt_render_frame( Image<cufx::StdByte3Pixel> &fr
 	vm::Timer::Scoped timer( [&]( auto dt ) {
 			ns2 = dt.ns().cnt();
 			auto m = std::min( ns0, std::min( ns1, ns2 ) );
-			ns0 /= m;
-			ns1 /= m;
-			ns2 /= m;
+			//			ns0 /= m;
+			//			ns1 /= m;
+			//			ns2 /= m;
 			if ( comm.rank == 0 ) {
-				vm::println("render/fetch/merge = {}/{}/{}", ns0, ns1, ns2 );
+				//				vm::println("render/fetch/merge/compute = {}/{}/{}", ns0, ns1, ns2 );
 			}
 		} );
 
@@ -245,22 +245,26 @@ std::size_t VolumeRenderer::dbuf_rt_render_frame( Image<cufx::StdByte3Pixel> &fr
 	auto s_height = ctx.recv.view().height() / comm.size;
 	auto s_bytes = ctx.recv.bytes() / recv_view.height() * s_height;
 
+	std::vector<MPI_Request> rs( comm.size * 2 );
 	for ( int i = 0; i < comm.size; ++i ) {
 		if ( i != comm.rank ) {
-			MPI_Request r1, r2;
 			MPI_Isend( &local_view.at_host( 0, i * s_height ), s_bytes,
-					   MPI_CHAR, i, 0, comm.comm, &r1 );
+					   MPI_CHAR, i, 0, comm.comm, &rs[ i ] );
 			MPI_Irecv( &recv_view.at_host( 0, i * s_height ), s_bytes,
-					   MPI_CHAR, i, 0, comm.comm, &r2 );
-			MPI_Wait( &r1, MPI_STATUS_IGNORE );
-			MPI_Wait( &r2, MPI_STATUS_IGNORE );
+					   MPI_CHAR, i, 0, comm.comm, &rs[ i + comm.size ] );
 		} else {
 			memcpy( &recv_view.at_host( 0, i * s_height ),
 					&local_view.at_host( 0, i * s_height ), s_bytes );
 		}
 	}
-
-	auto f0 = z_order[ 0 ] * s_height;
+	for ( int i = 0; i < comm.size; ++i ) {
+		if ( i != comm.rank ) {
+			MPI_Wait( &rs[ i ], MPI_STATUS_IGNORE );
+			MPI_Wait( &rs[ i + comm.size ], MPI_STATUS_IGNORE );
+		}
+	}
+	
+	auto f0 = z_order[ 0 ] * s_height;		
 	for ( int k = 1; k < comm.size; ++k ) {
 		auto f1 = z_order[ k ] * s_height;
 		for ( int j = 0; j < s_height; ++j ) {
@@ -274,26 +278,26 @@ std::size_t VolumeRenderer::dbuf_rt_render_frame( Image<cufx::StdByte3Pixel> &fr
 			}
 		}
 	}
-
 	auto tmp_view = ctx.tmp->view();
-	for ( int j = 0; j != s_height; ++j ) {
-		for ( int i = 0; i != recv_view.width(); ++i ) {
+	for ( int j = 0; j < s_height; ++j ) {
+		for ( int i = 0; i < recv_view.width(); ++i ) {
 			auto &v = recv_view.at_host( i, j + f0 ).val;
 			v.x = linear_to_srgb( v.x );
 			v.y = linear_to_srgb( v.y );
 			v.z = linear_to_srgb( v.z );
 			auto val = saturate( v );
-			reinterpret_cast<uchar3&>( tmp_view.at_host( i, j ) ) = uchar3{ val.x, val.y, val.z };
+			reinterpret_cast<uchar3&>( tmp_view.at_host( i, j ) ) =
+				uchar3{ val.x, val.y, val.z };
 		}
 	}
-		
+
 	auto frame_view = frame.view();
 	auto t_bytes = ctx.tmp->bytes();
 	for ( int i = 1; i < comm.size; ++i ) {
 		if ( comm.rank == 0 ) {
 			MPI_Recv( &frame_view.at_host( 0, i * s_height ), t_bytes,
 					  MPI_CHAR, i, 0, comm.comm, MPI_STATUS_IGNORE );
-		} else {
+		} else if ( i == comm.rank ) {
 			MPI_Send( &tmp_view.at_host( 0, 0 ), t_bytes,
 					  MPI_CHAR, 0, 0, comm.comm );
 		}

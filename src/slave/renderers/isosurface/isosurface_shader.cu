@@ -79,7 +79,7 @@ struct IsosurfaceShaderKernel : IsosurfaceShader
 						float a = ( isovalue - prev_value ) / ( value - prev_value );
 						vec3 inter_p = ( 1.f - a ) * ( p - dt * d ) + a * p;
 						/* TODO: sample at different dt for each axis to avoid having undo scaling */
-						vec3 nn = gradient( sampler, inter_p - ip, dt * 2.f );
+						vec3 nn = gradient( sampler, inter_p - ip, du * 2.f );
 
 						/* TODO: can we optimize somehow? */
 						vec3 world_p = vec3( to_world * vec4( inter_p, 1.f ) );

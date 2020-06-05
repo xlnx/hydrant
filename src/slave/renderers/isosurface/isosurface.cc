@@ -147,6 +147,7 @@ struct IsosurfaceRtRenderCtx : DbufRtRenderCtx
 	Image<IsosurfaceShader::Pixel> film;
 	Image<IsosurfaceFetchPixel> local;
 	Image<IsosurfaceFetchPixel> recv;
+	std::unique_ptr<Image<cufx::StdByte3Pixel>> tmp;
 	std::unique_ptr<RtBlockPagingServer> srv;
 
 public:
@@ -201,6 +202,12 @@ std::size_t IsosurfaceRenderer::dbuf_rt_render_frame( Image<cufx::StdByte3Pixel>
 	shader.eye_pos = loop.camera.position;
 	shader.paging = ctx.srv->update( culler, loop.camera );
 	
+	if ( !ctx.tmp ) {
+		ctx.tmp.reset( new Image<cufx::StdByte3Pixel>( ImageOptions{}
+		                                    .set_resolution( resolution.x,
+															 resolution.y / comm.size ) ) );
+	}
+
 	auto opts = RaycastingOptions{}.set_device( device );
 	{
 		vm::Timer::Scoped timer( [&]( auto dt ) {
@@ -234,52 +241,70 @@ std::size_t IsosurfaceRenderer::dbuf_rt_render_frame( Image<cufx::StdByte3Pixel>
 			ns1 /= m;
 			ns2 /= m;
 			if ( comm.rank == 0 ) {
-				vm::println("render/fetch/merge = {}/{}/{}", ns0, ns1, ns2 );
+				// vm::println("render/fetch/merge = {}/{}/{}", ns0, ns1, ns2 );
 			}
 		});
-	
-	int shl = 0;
-	int flag = comm.size - 1;
-	int rank = comm.rank;
-	while ( flag ) {
-		// sender
-		if ( rank & 1 ) {
-			auto dst = ( rank & -2 ) << shl;
-			MPI_Send( &ctx.local.view().at_host( 0, 0 ), ctx.local.bytes(),
-					  MPI_CHAR, dst, 0, comm.comm );
-			break;
-		} else if ( flag != rank ) {
-			auto src = ( rank | 1 ) << shl;
-			MPI_Recv( &ctx.recv.view().at_host( 0, 0 ), ctx.recv.bytes(),
-					  MPI_CHAR, src, 0, comm.comm, MPI_STATUS_IGNORE );
-			auto local_view = ctx.local.view();
-			auto recv_view = ctx.recv.view();
-			for ( int j = 0; j != local_view.height(); ++j ) {
-				for ( int i = 0; i != local_view.width(); ++i ) {
-					auto &local = local_view.at_host( i, j );
-					auto &recv = recv_view.at_host( i, j );
-					if ( recv.depth < local.depth ) {
-						local.val = uchar3{ recv.val.x, 0, 0 };
-					}
-				}
-			}
+
+	auto local_view = ctx.local.view();
+	auto recv_view = ctx.recv.view();
+	auto s_height = ctx.recv.view().height() / comm.size;
+	auto s_bytes = ctx.recv.bytes() / recv_view.height() * s_height;
+
+	std::vector<MPI_Request> rs( comm.size * 2 );
+	for ( int i = 0; i < comm.size; ++i ) {
+		if ( i != comm.rank ) {
+			MPI_Isend( &local_view.at_host( 0, i * s_height ), s_bytes,
+					   MPI_CHAR, i, 0, comm.comm, &rs[ i ] );
+			MPI_Irecv( &recv_view.at_host( 0, i * s_height ), s_bytes,
+					   MPI_CHAR, i, 0, comm.comm, &rs[ i + comm.size ] );
+		} else {
+			memcpy( &recv_view.at_host( 0, i * s_height ),
+					&local_view.at_host( 0, i * s_height ), s_bytes );
 		}
-		shl += 1;
-		flag >>= 1;
-		rank >>= 1;
+	}
+	for ( int i = 0; i < comm.size; ++i ) {
+		if ( i != comm.rank ) {
+			MPI_Wait( &rs[ i ], MPI_STATUS_IGNORE );
+			MPI_Wait( &rs[ i + comm.size ], MPI_STATUS_IGNORE );
+		}
 	}
 	
+	auto f0 = z_order[ 0 ] * s_height;
+	for ( int k = 1; k < comm.size; ++k ) {
+		auto f1 = z_order[ k ] * s_height;
+		for ( int j = 0; j < s_height; ++j ) {
+			for ( int i = 0; i < recv_view.width(); ++i ) {
+				auto &front = recv_view.at_host( i, j + f0 );
+				auto &back = recv_view.at_host( i, j + f1 );
+				if ( back.depth < front.depth ) { front = back; }
+			}
+		}
+	}
+	auto tmp_view = ctx.tmp->view();
+	for ( int j = 0; j < s_height; ++j ) {
+		for ( int i = 0; i < recv_view.width(); ++i ) {
+			auto &val = recv_view.at_host( i, j + f0 ).val;
+			reinterpret_cast<uchar3&>( tmp_view.at_host( i, j ) ) =
+				uchar3{ val.x, val.y, val.z };
+		}
+	}
+
+	auto frame_view = frame.view();
+	auto t_bytes = ctx.tmp->bytes();
+	for ( int i = 1; i < comm.size; ++i ) {
+		if ( comm.rank == 0 ) {
+			MPI_Recv( &frame_view.at_host( 0, i * s_height ), t_bytes,
+					  MPI_CHAR, i, 0, comm.comm, MPI_STATUS_IGNORE );
+		} else if ( i == comm.rank ) {
+			MPI_Send( &tmp_view.at_host( 0, 0 ), t_bytes,
+					  MPI_CHAR, 0, 0, comm.comm );
+		}
+	}
 	if ( comm.rank == 0 ) {
-		auto local_view = ctx.local.view();
-		auto frame_view = frame.view();
-		for ( int j = 0; j != local_view.height(); ++j ) {
-			for ( int i = 0; i != local_view.width(); ++i ) {
-				reinterpret_cast<uchar3&>( frame_view.at_host( i, j ) ) =
-					local_view.at_host( i, j ).val;
-			}
-		}
+		memcpy( &frame_view.at_host( 0, 0 ),
+				&tmp_view.at_host( 0, 0 ), t_bytes );
 	}
-	
+
 	MPI_Barrier( comm.comm );
 
 	return render_t;

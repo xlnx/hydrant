@@ -199,6 +199,21 @@ private:
 		ui_camera_bar();
 		ImGui::End();
 
+		static double last = NAN;
+		if ( !isnan( last ) ) {
+			auto &ptu = *config.params.camera.ptu;
+			auto f = normalize( ptu.target - ptu.position );
+			auto r = normalize( cross( f, ptu.up ) );
+			auto u = normalize( ptu.up );
+			auto dp = ( f * speed.y + r * speed.x + u * speed.z ) * velocity;
+			auto sec = glfwGetTime();
+			ptu.position += dp * float( sec - last );
+			ptu.target += dp * float( sec - last);
+			last = sec;
+		} else {
+			last = glfwGetTime();
+		}
+
 		ImGui::Begin( "Renderer" );
 		auto time = glfwGetTime();
 		if ( isnan( prev ) ) {
@@ -217,20 +232,23 @@ private:
 
 	void ui_camera_bar()
 	{
-		vec3 &arm = config.params.camera.orbit->arm;
-		arm.x = radians( arm.x );
-		arm.y = radians( arm.y );
-		ImGui::SliderAngle( "Yaw", &arm.x, -180, 180 );
-		ImGui::SliderAngle( "Pitch", &arm.y, -89, 89 );
-		ImGui::SliderFloat( "Distance", &arm.z, 0.1, 3.2 );
-		arm.x = degrees( arm.x );
-		arm.y = degrees( arm.y );
+		vec3 &position = config.params.camera.ptu->position;
+		vec3 front = normalize( config.params.camera.ptu->target - position );
+		ImGui::InputFloat3( "Position", &position.x );
+		ImGui::InputFloat3( "Front", &front.x );
+		ImGui::InputFloat( "Velocity", &velocity );
+		config.params.camera.ptu->target = position + front;
+		//		ImGui::SliderAngle( "Pitch", &arm.y, -89, 89 );
+		//		ImGui::SliderFloat( "Distance", &arm.z, 0.1, 3.2 );
+		//		arm.x = degrees( arm.x );
+		//		arm.y = degrees( arm.y );
 	}
 
 	void ui_renderer_bar()
 	{
 		if ( ImGui::CollapsingHeader( "Basic", ImGuiTreeNodeFlags_DefaultOpen ) ) {
 			auto params = config.params.render.params.get<BasicRendererParams>();
+			ImGui::SliderFloat( "Sample Rate", &params.sample_rate, 0.1, 10 );
 			ImGui::InputInt( "Max Steps", &params.max_steps );
 			ImGui::ColorEdit3( "Background", reinterpret_cast<float *>( &params.clear_color.data ) );
 			if ( ImGui::Button( "Use Window Background" ) ) {
@@ -261,30 +279,35 @@ private:
 	void on_cursor_pos( double x1, double y1 ) override
 	{
 		if ( trackball_rec ) {
-			vec3 &arm = config.params.camera.orbit->arm;
-			arm.x += -( x1 - x0 ) / resolution.x * 90;
-			arm.y += ( y1 - y0 ) / resolution.y * 90;
-			arm.y = glm::clamp( arm.y, -90.f, 90.f );
+			auto &ptu = *config.params.camera.ptu;
+			auto f = normalize( ptu.target - ptu.position );
+			auto r = normalize( cross( f, ptu.up ) );
+			float dx = ( x1 - x0 ) / resolution.x * M_PI;
+			float dy = ( y1 - y0 ) / resolution.y * M_PI;
+			auto rot = rotate( rotate( mat4( 1 ), dy, r ), dx, ptu.up );
+			ptu.target = ptu.position + vec3( rot * vec4( f, 0 ) );
 		}
 		x0 = x1;
 		y0 = y1;
 	}
 
-	void on_scroll( double dx, double dy ) override
+	void on_key( int key, int scancode, int action, int mods ) override
 	{
-		vec3 &arm = config.params.camera.orbit->arm;
-		arm.z += dy * ( -5e-2 );
-		arm.z = glm::clamp( arm.z, .1f, 3.f );
+		int down;
+		switch ( action ) {
+		case GLFW_PRESS: down = 1; break;
+		case GLFW_RELEASE: down = 0; break;
+		default: return;
+		}
+		switch ( key ) {
+		case GLFW_KEY_W: speed.y = down; break;
+		case GLFW_KEY_S: speed.y = -down; break;
+		case GLFW_KEY_A: speed.x = -down; break;
+		case GLFW_KEY_D: speed.x = down; break;
+		case GLFW_KEY_Q: speed.z = down; break;
+		case GLFW_KEY_E: speed.z = -down; break;
+		}
 	}
-
-	// 	void on_key( int key, int scancode, int action, int mods ) override
-	// 	{
-	// 		if ( key == GLFW_KEY_SPACE && action == GLFW_PRESS ) {
-	// 			auto writer = vm::json::Writer{}
-	// 							.set_indent( 2 );
-	// 			vm::println( "{}", writer.write( orbit ) );
-	// 		}
-	// 	}
 
 private:
 	vm::Box<IUi> ctrl_ui;
@@ -301,7 +324,9 @@ private:
 	double prev = NAN;
 	int nframes = 0;
 	int fps = 0;
-	
+
+	float velocity = 1;
+	vec3 speed = { 0, 0, 0 };
 	bool trackball_rec = false;
 	double x0, y0;
 };

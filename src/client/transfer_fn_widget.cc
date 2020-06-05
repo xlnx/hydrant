@@ -102,6 +102,7 @@ bool TransferFunctionWidget::select_colormap(const std::string &name)
 	if (it == colormaps.end()) return false;
 	selected_colormap = it - colormaps.begin();
 	update_colormap();
+	return true;
 }
 
 void TransferFunctionWidget::add_colormap(const Colormap &map)

@@ -1,11 +1,21 @@
 {
     "camera": {
-        "orbit": {
-            "arm": [
-                -182.109375,
-                -0.52734375,
-                2.00000023841858
-            ]
+        "ptu": {
+            "position": [
+                2,
+                0,
+                2.2
+            ],
+			"target": [
+				0,
+				0,
+				0
+			],
+			"up": [
+				0,
+				1,
+				0
+			]
         },
         "perspective": {
             "fovy": 60
@@ -29,8 +39,7 @@
                 0
             ],
             "isovalue": 0.3,
-            "mode": "Color",
-            "max_steps": 4000
+            "mode": "Color"
         }
     }
 }
